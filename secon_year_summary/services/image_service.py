@@ -4,6 +4,7 @@
 
 import asyncio
 import io
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
@@ -75,7 +76,7 @@ async def create_summary_image(
         return None
 
     # 画像の読み込みと日付の追加
-    images = []
+    images_with_dates = []
     for data, date_info in successful_downloads:
         try:
             img = Image.open(io.BytesIO(data))
@@ -116,55 +117,69 @@ async def create_summary_image(
                     fill=(255, 128, 0, 180),  # オレンジ色、透明度180/255
                 )
 
-            images.append(img)
+                # 日付情報と画像を格納
+                images_with_dates.append((img, date_info))
         except Exception as e:
             print(f"画像の処理に失敗しました: {e}")
+
+    if not images_with_dates:
+        print("画像の処理に失敗しました。")
+        return None
+
+    # 日付の新しい順（降順）にソート
+    images_with_dates.sort(key=lambda x: x[1], reverse=True)
+
+    # ソートされた画像のみを取得
+    images = [img for img, _ in images_with_dates]
 
     if not images:
         print("画像の処理に失敗しました。")
         return None
 
-    # 最大4枚までの画像を使用
-    images = images[:4]
+    # 最適なグリッドレイアウトの決定
+    num_images = len(images)
 
-    # 画像の配置を決定
-    if len(images) == 1:
-        # 1枚の場合
-        width = images[0].width
-        height = images[0].height  # テキスト用の余白を削除
-        layout = [(0, 0)]
-    elif len(images) == 2:
-        # 2枚の場合は横に並べる
-        width = images[0].width + images[1].width
-        height = max(images[0].height, images[1].height)
-        layout = [(0, 0), (images[0].width, 0)]
-    elif len(images) == 3:
-        # 3枚の場合は上に1枚、下に2枚
-        width = max(images[0].width, images[1].width + images[2].width)
-        height = images[0].height + max(images[1].height, images[2].height)
-        layout = [
-            ((width - images[0].width) // 2, 0),
-            (0, images[0].height),
-            (images[1].width, images[0].height),
-        ]
+    # グリッドのレイアウトを決定（行と列の数）
+    if num_images <= 1:
+        rows, cols = 1, 1
+    elif num_images <= 2:
+        rows, cols = 1, 2
+    elif num_images <= 4:
+        rows, cols = 2, 2
+    elif num_images <= 6:
+        rows, cols = 2, 3
+    elif num_images <= 9:
+        rows, cols = 3, 3
+    elif num_images <= 12:
+        rows, cols = 3, 4
     else:
-        # 4枚の場合は2x2グリッド
-        width = images[0].width + images[1].width
-        height = images[0].height + images[2].height
-        layout = [
-            (0, 0),
-            (images[0].width, 0),
-            (0, images[0].height),
-            (images[1].width, images[1].height),
-        ]
+        # それ以上の場合、ほぼ正方形に近いグリッドを作成
+        cols = math.ceil(math.sqrt(num_images))
+        rows = math.ceil(num_images / cols)
+
+    # 画像の幅と高さを取得（均一サイズを前提）
+    img_width = images[0].width
+    img_height = images[0].height
+
+    # 全体の画像サイズを計算
+    width = cols * img_width
+    height = rows * img_height
 
     # 新しい画像を作成
     result = Image.new("RGB", (width, height), color=(255, 255, 255))
 
-    # 画像の貼り付け
+    # 画像を配置
     for i, img in enumerate(images):
-        if i < len(layout):
-            result.paste(img, layout[i])
+        if i >= rows * cols:
+            break  # グリッドに収まる数だけ処理
+
+        row = i // cols
+        col = i % cols
+
+        x = col * img_width
+        y = row * img_height
+
+        result.paste(img, (x, y))
 
     # 画像の保存
     output_path.parent.mkdir(parents=True, exist_ok=True)
