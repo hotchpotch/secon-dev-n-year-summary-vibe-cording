@@ -92,11 +92,20 @@ class ArticleFetcher:
         """HTMLを解析して記事オブジェクトを作成する"""
         soup = BeautifulSoup(html, "html.parser")
 
-        # タイトルの抽出（h1タグから取得）
-        title_tag = soup.find("h1")
+        # タイトルの抽出（headのtitleタグから取得）
+        title_tag = soup.find("title")
         if not title_tag:
-            return None
+            # head内のtitleがない場合はh1タグから取得を試みる
+            title_tag = soup.find("h1")
+            if not title_tag:
+                return None
+
         title = title_tag.get_text(strip=True)
+
+        # サイト名がタイトルに含まれているかもしれないので、適切に処理する
+        # 例: "記事タイトル - サイト名" の形式であれば、サイト名を除外
+        if " - " in title:
+            title = title.split(" - ")[0]
 
         # 本文の抽出（記事本文はentry-contentクラスやarticleタグなどにあると想定）
         content_tag = soup.find(class_="entry-content") or soup.find("article")

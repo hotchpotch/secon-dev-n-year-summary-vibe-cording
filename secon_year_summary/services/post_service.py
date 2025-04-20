@@ -31,7 +31,7 @@ def post_to_stdout(
 
     print("\n📊 メタデータ")
     print("-" * 50)
-    for article in sorted(articles, key=lambda a: a.year):
+    for article in sorted(articles, key=lambda a: a.year, reverse=True):
         print(f"✦ {article.year}年: {article.title}")
         print(f"  URL: {article.url}")
     print("-" * 50)
@@ -59,7 +59,7 @@ async def post_to_discord(
 
     # メタデータ部分の作成
     metadata = "**📊 メタデータ**\n"
-    for article in sorted(articles, key=lambda a: a.year):
+    for article in sorted(articles, key=lambda a: a.year, reverse=True):
         metadata += f"✦ **{article.year}年**: {article.title}\n"
         metadata += f"  URL: {article.url}\n"
 
@@ -147,7 +147,7 @@ async def post_to_slack(
     ]
 
     # メタデータの追加
-    for article in sorted(articles, key=lambda a: a.year):
+    for article in sorted(articles, key=lambda a: a.year, reverse=True):
         blocks.append(
             {
                 "type": "section",

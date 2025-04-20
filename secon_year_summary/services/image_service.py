@@ -88,13 +88,13 @@ async def create_summary_image(
                 draw = ImageDraw.Draw(img, "RGBA")  # "RGBA"モードを使って透明度を設定
                 try:
                     # フォントの設定
-                    font = ImageFont.truetype("Arial", 16)
+                    font = ImageFont.truetype("Arial", 12)
                 except IOError:
                     # フォントが見つからない場合はデフォルトフォントを使用
                     font = ImageFont.load_default()
 
                 # 日付テキスト
-                date_text = f"{year}/{month:02d}/{day:02d}"
+                date_text = f"{year}.{month:02d}.{day:02d}"
 
                 # テキストのサイズを取得
                 # textlengthはPIL 9.2.0以降で使えるが、古いバージョンではtextsize[0]を使う
@@ -131,55 +131,35 @@ async def create_summary_image(
     if len(images) == 1:
         # 1枚の場合
         width = images[0].width
-        height = images[0].height + 50  # テキスト用の余白
-        layout = [(0, 50)]
+        height = images[0].height  # テキスト用の余白を削除
+        layout = [(0, 0)]
     elif len(images) == 2:
         # 2枚の場合は横に並べる
         width = images[0].width + images[1].width
-        height = max(images[0].height, images[1].height) + 50
-        layout = [(0, 50), (images[0].width, 50)]
+        height = max(images[0].height, images[1].height)
+        layout = [(0, 0), (images[0].width, 0)]
     elif len(images) == 3:
         # 3枚の場合は上に1枚、下に2枚
         width = max(images[0].width, images[1].width + images[2].width)
-        height = images[0].height + max(images[1].height, images[2].height) + 50
+        height = images[0].height + max(images[1].height, images[2].height)
         layout = [
-            ((width - images[0].width) // 2, 50),
-            (0, 50 + images[0].height),
-            (images[1].width, 50 + images[0].height),
+            ((width - images[0].width) // 2, 0),
+            (0, images[0].height),
+            (images[1].width, images[0].height),
         ]
     else:
         # 4枚の場合は2x2グリッド
         width = images[0].width + images[1].width
-        height = images[0].height + images[2].height + 50
+        height = images[0].height + images[2].height
         layout = [
-            (0, 50),
-            (images[0].width, 50),
-            (0, 50 + images[0].height),
-            (images[1].width, 50 + images[1].height),
+            (0, 0),
+            (images[0].width, 0),
+            (0, images[0].height),
+            (images[1].width, images[1].height),
         ]
 
     # 新しい画像を作成
     result = Image.new("RGB", (width, height), color=(255, 255, 255))
-
-    # フォントの設定
-    try:
-        # デフォルトフォントを使用（英語のみ対応）
-        font = ImageFont.truetype("Arial", 24)
-    except IOError:
-        # フォントが見つからない場合はデフォルトフォントを使用
-        font = ImageFont.load_default()
-
-    # 日付テキストの描画
-    draw = ImageDraw.Draw(result)
-    date_text = target_date.strftime("%B %d")
-
-    # テキストのサイズを取得
-    try:
-        text_width = draw.textlength(date_text, font=font)
-    except AttributeError:
-        text_width, _ = draw.textsize(date_text, font=font)
-
-    draw.text(((width - text_width) // 2, 10), date_text, font=font, fill=(0, 0, 0))
 
     # 画像の貼り付け
     for i, img in enumerate(images):

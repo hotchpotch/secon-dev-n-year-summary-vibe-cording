@@ -57,7 +57,7 @@ class OpenAIService(LLMService):
         prompt = f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
         prompt += "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。より具体的なエピソードや感想を含めると良いです。\n\n"
 
-        for year, article_data in sorted(articles_by_year.items()):
+        for year, article_data in sorted(articles_by_year.items(), reverse=True):
             prompt += f"## {year}年の記事\n"
             prompt += f"タイトル: {article_data['title']}\n"
             prompt += f"内容: {article_data['content'][:1000]}...\n\n"
@@ -92,16 +92,17 @@ class GeminiService(LLMService):
         try:
             import google.generativeai as genai
 
-            genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-            self.model = genai.GenerativeModel(model_name=model)
+            try:
+                genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+                self.model = genai.GenerativeModel(model_name=model)
+            except AttributeError:
+                # configure や GenerativeModel がない場合の対処
+                raise ImportError(
+                    "Google Gemini APIのバージョンが古いか、互換性がありません。"
+                )
         except ImportError:
             raise ImportError(
                 "Google Gemini APIを使用するには、google-generativeaiパッケージをインストールしてください。"
-            )
-        except AttributeError:
-            # configure や GenerativeModel がない場合の対処
-            raise ImportError(
-                "Google Gemini APIのバージョンが古いか、互換性がありません。"
             )
 
     async def generate_summary(
@@ -121,7 +122,7 @@ class GeminiService(LLMService):
         prompt = f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
         prompt += "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。より具体的なエピソードや感想を含めると良いです。\n\n"
 
-        for year, article_data in sorted(articles_by_year.items()):
+        for year, article_data in sorted(articles_by_year.items(), reverse=True):
             prompt += f"## {year}年の記事\n"
             prompt += f"タイトル: {article_data['title']}\n"
             prompt += f"内容: {article_data['content'][:1000]}...\n\n"
@@ -174,7 +175,7 @@ class ClaudeService(LLMService):
         prompt = f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
         prompt += "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。より具体的なエピソードや感想を含めると良いです。\n\n"
 
-        for year, article_data in sorted(articles_by_year.items()):
+        for year, article_data in sorted(articles_by_year.items(), reverse=True):
             prompt += f"## {year}年の記事\n"
             prompt += f"タイトル: {article_data['title']}\n"
             prompt += f"内容: {article_data['content'][:1000]}...\n\n"
