@@ -42,9 +42,17 @@ async def create_summary_image(
     """
     # 画像URLの収集（重複を除外）
     image_urls = set()
+    article_dates = {}  # 画像URLと記事の年月日を関連付ける辞書
+
     for article in articles:
         if article.image_url:
             image_urls.add(article.image_url)
+            # 画像URLと日付情報を関連付ける
+            article_dates[article.image_url] = (
+                article.year,
+                article.month,
+                article.day,
+            )
 
     if not image_urls:
         print("画像URLが見つかりませんでした。")
@@ -56,19 +64,58 @@ async def create_summary_image(
         image_data_list = await asyncio.gather(*tasks)
 
     # 成功したダウンロードのみフィルタリング
-    image_data_list = [data for data in image_data_list if data]
+    successful_downloads = []
+    for i, data in enumerate(image_data_list):
+        if data:
+            url = list(image_urls)[i]
+            successful_downloads.append((data, article_dates.get(url)))
 
-    if not image_data_list:
+    if not successful_downloads:
         print("画像のダウンロードに失敗しました。")
         return None
 
-    # 画像の読み込み
+    # 画像の読み込みと日付の追加
     images = []
-    for data in image_data_list:
+    for data, date_info in successful_downloads:
         try:
             img = Image.open(io.BytesIO(data))
             # サイズを統一（サムネイルサイズに）
             img.thumbnail((300, 300))
+
+            # 日付情報を追加（右下、オレンジ色、半透明、小さめ）
+            if date_info:
+                year, month, day = date_info
+                draw = ImageDraw.Draw(img, "RGBA")  # "RGBA"モードを使って透明度を設定
+                try:
+                    # フォントの設定
+                    font = ImageFont.truetype("Arial", 16)
+                except IOError:
+                    # フォントが見つからない場合はデフォルトフォントを使用
+                    font = ImageFont.load_default()
+
+                # 日付テキスト
+                date_text = f"{year}/{month:02d}/{day:02d}"
+
+                # テキストのサイズを取得
+                # textlengthはPIL 9.2.0以降で使えるが、古いバージョンではtextsize[0]を使う
+                try:
+                    text_width = draw.textlength(date_text, font=font)
+                    text_height = font.size
+                except AttributeError:
+                    text_width, text_height = draw.textsize(date_text, font=font)
+
+                # 右下に配置するための座標
+                x = img.width - text_width - 10
+                y = img.height - text_height - 5
+
+                # 半透明のオレンジ色で日付を描画（RGBA形式で透明度を指定）
+                draw.text(
+                    (x, y),
+                    date_text,
+                    font=font,
+                    fill=(255, 128, 0, 180),  # オレンジ色、透明度180/255
+                )
+
             images.append(img)
         except Exception as e:
             print(f"画像の処理に失敗しました: {e}")
@@ -125,7 +172,13 @@ async def create_summary_image(
     # 日付テキストの描画
     draw = ImageDraw.Draw(result)
     date_text = target_date.strftime("%B %d")
-    text_width = draw.textlength(date_text, font=font)
+
+    # テキストのサイズを取得
+    try:
+        text_width = draw.textlength(date_text, font=font)
+    except AttributeError:
+        text_width, _ = draw.textsize(date_text, font=font)
+
     draw.text(((width - text_width) // 2, 10), date_text, font=font, fill=(0, 0, 0))
 
     # 画像の貼り付け

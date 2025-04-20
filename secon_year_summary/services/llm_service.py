@@ -54,16 +54,16 @@ class OpenAIService(LLMService):
 
         # プロンプトの構築
         # 各年ごとに記事の内容を含めたプロンプトを作成
-        prompt = f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに100文字程度でまとめてください。\n"
-        prompt += "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。\n\n"
+        prompt = f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
+        prompt += "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。より具体的なエピソードや感想を含めると良いです。\n\n"
 
         for year, article_data in sorted(articles_by_year.items()):
             prompt += f"## {year}年の記事\n"
             prompt += f"タイトル: {article_data['title']}\n"
-            prompt += f"内容: {article_data['content'][:500]}...\n\n"
+            prompt += f"内容: {article_data['content'][:1000]}...\n\n"
 
         prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
-        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[100文字程度の要約]\n"
+        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
 
         # APIを呼び出して要約を生成
         # OpenAIのSDKは非同期をネイティブにサポートしていないため、同期的に呼び出す
@@ -71,8 +71,12 @@ class OpenAIService(LLMService):
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
-            max_tokens=1000,
+            max_tokens=1500,
         )
+
+        # 返り値がNoneの場合があるのでその対応
+        if response.choices[0].message.content is None:
+            return "サマリーの生成に失敗しました。"
 
         return response.choices[0].message.content
 
@@ -89,10 +93,15 @@ class GeminiService(LLMService):
             import google.generativeai as genai
 
             genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-            self.model = genai.GenerativeModel(model)
+            self.model = genai.GenerativeModel(model_name=model)
         except ImportError:
             raise ImportError(
                 "Google Gemini APIを使用するには、google-generativeaiパッケージをインストールしてください。"
+            )
+        except AttributeError:
+            # configure や GenerativeModel がない場合の対処
+            raise ImportError(
+                "Google Gemini APIのバージョンが古いか、互換性がありません。"
             )
 
     async def generate_summary(
@@ -109,20 +118,25 @@ class GeminiService(LLMService):
             }
 
         # プロンプトの構築
-        prompt = f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに100文字程度でまとめてください。\n"
-        prompt += "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。\n\n"
+        prompt = f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
+        prompt += "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。より具体的なエピソードや感想を含めると良いです。\n\n"
 
         for year, article_data in sorted(articles_by_year.items()):
             prompt += f"## {year}年の記事\n"
             prompt += f"タイトル: {article_data['title']}\n"
-            prompt += f"内容: {article_data['content'][:500]}...\n\n"
+            prompt += f"内容: {article_data['content'][:1000]}...\n\n"
 
         prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
-        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[100文字程度の要約]\n"
+        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
 
         # APIを呼び出して要約を生成
-        response = await self.model.generate_content_async(prompt)
-        return response.text
+        # 同期的に呼び出す
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            print(f"Geminiでのサマリー生成中にエラーが発生しました: {e}")
+            return "サマリーの生成に失敗しました。"
 
 
 class ClaudeService(LLMService):
@@ -157,25 +171,28 @@ class ClaudeService(LLMService):
             }
 
         # プロンプトの構築
-        prompt = f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに100文字程度でまとめてください。\n"
-        prompt += "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。\n\n"
+        prompt = f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
+        prompt += "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。より具体的なエピソードや感想を含めると良いです。\n\n"
 
         for year, article_data in sorted(articles_by_year.items()):
             prompt += f"## {year}年の記事\n"
             prompt += f"タイトル: {article_data['title']}\n"
-            prompt += f"内容: {article_data['content'][:500]}...\n\n"
+            prompt += f"内容: {article_data['content'][:1000]}...\n\n"
 
         prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
-        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[100文字程度の要約]\n"
+        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
 
-        # APIを呼び出して要約を生成
-        response = await self.client.messages.create(
-            model=self.model,
-            max_tokens=1000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
-        return response.content[0].text
+        # APIを呼び出して要約を生成（同期的に呼び出す）
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=1500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return response.content[0].text
+        except Exception as e:
+            print(f"Claudeでのサマリー生成中にエラーが発生しました: {e}")
+            return "サマリーの生成に失敗しました。"
 
 
 def get_llm_service(model_spec: str) -> LLMService:
