@@ -168,7 +168,9 @@ async def create_summary_image(
     height = rows * img_height
 
     # 新しい画像を作成
-    result = Image.new("RGB", (width, height), color=(255, 255, 255))
+    result = Image.new(
+        "RGB", (width, height), color=(51, 51, 51)
+    )  # ダークグレー #333333
 
     # 画像を配置
     for i, img in enumerate(images):
