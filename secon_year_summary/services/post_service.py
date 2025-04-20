@@ -58,10 +58,10 @@ async def post_to_discord(
         return
 
     # メタデータ部分の作成
-    metadata = "**📊 メタデータ**\n"
+    metadata = ""
     for article in sorted(articles, key=lambda a: a.year, reverse=True):
         metadata += f"✦ **{article.year}年**: {article.title}\n"
-        metadata += f"  URL: {article.url}\n"
+        metadata += f"{article.url}\n"
 
     # 投稿内容の作成
     content = f"**📅 {articles[0].month}月{articles[0].day}日のサマリー**\n\n"
@@ -94,7 +94,6 @@ async def post_to_discord(
             "content": content,
             "embeds": [
                 {
-                    "title": "メタデータ",
                     "description": metadata,
                     "color": 5814783,  # カラーコード（青色）
                 }
