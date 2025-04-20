@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "secon-year-summary"
+version = "0.1.0"
+description = "secon.dev年間サマリー生成ツール"
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "aiohttp",
+    "beautifulsoup4",
+    "openai",
+    "google-generativeai",
+    "anthropic",
+    "pillow",
+    "python-dotenv",
+    "asyncio",
+]
+
+[project.scripts]
+secon-year-summary = "secon_year_summary.cli:main" 
