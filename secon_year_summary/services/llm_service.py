@@ -66,7 +66,8 @@ class OpenAIService(LLMService):
         prompt += "## YYYY年MM月DD日 [絵文字]\n\n[100文字程度の要約]\n"
 
         # APIを呼び出して要約を生成
-        response = await self.client.chat.completions.create(
+        # OpenAIのSDKは非同期をネイティブにサポートしていないため、同期的に呼び出す
+        response = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
