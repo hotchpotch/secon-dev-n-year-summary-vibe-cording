@@ -46,21 +46,33 @@ class OpenAIService(LLMService):
         # 各年ごとの記事コンテンツをまとめる
         articles_by_year = {}
         for article in articles:
-            articles_by_year[article.year] = {
+            year = article.year
+            article_data = {
                 "title": article.title,
                 "content": article.content,
                 "url": article.url,
             }
+
+            if year not in articles_by_year:
+                articles_by_year[year] = [article_data]
+            else:
+                articles_by_year[year].append(article_data)
 
         # プロンプトの構築
         # 各年ごとに記事の内容を含めたプロンプトを作成
         prompt = f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
         prompt += "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。より具体的なエピソードや感想を含めると良いです。\n\n"
 
-        for year, article_data in sorted(articles_by_year.items(), reverse=True):
+        for year, article_list in sorted(articles_by_year.items(), reverse=True):
             prompt += f"## {year}年の記事\n"
-            prompt += f"タイトル: {article_data['title']}\n"
-            prompt += f"内容: {article_data['content'][:1000]}...\n\n"
+
+            for i, article_data in enumerate(article_list):
+                if i > 0:
+                    prompt += "\n--- 同じ日の別記事 ---\n"
+                prompt += f"タイトル: {article_data['title']}\n"
+                prompt += f"内容: {article_data['content'][:1000]}...\n"
+
+            prompt += "\n"
 
         prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
         prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
@@ -112,20 +124,32 @@ class GeminiService(LLMService):
         # 各年ごとの記事コンテンツをまとめる
         articles_by_year = {}
         for article in articles:
-            articles_by_year[article.year] = {
+            year = article.year
+            article_data = {
                 "title": article.title,
                 "content": article.content,
                 "url": article.url,
             }
 
+            if year not in articles_by_year:
+                articles_by_year[year] = [article_data]
+            else:
+                articles_by_year[year].append(article_data)
+
         # プロンプトの構築
         prompt = f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
         prompt += "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。より具体的なエピソードや感想を含めると良いです。\n\n"
 
-        for year, article_data in sorted(articles_by_year.items(), reverse=True):
+        for year, article_list in sorted(articles_by_year.items(), reverse=True):
             prompt += f"## {year}年の記事\n"
-            prompt += f"タイトル: {article_data['title']}\n"
-            prompt += f"内容: {article_data['content'][:1000]}...\n\n"
+
+            for i, article_data in enumerate(article_list):
+                if i > 0:
+                    prompt += "\n--- 同じ日の別記事 ---\n"
+                prompt += f"タイトル: {article_data['title']}\n"
+                prompt += f"内容: {article_data['content'][:1000]}...\n"
+
+            prompt += "\n"
 
         prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
         prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
@@ -165,20 +189,32 @@ class ClaudeService(LLMService):
         # 各年ごとの記事コンテンツをまとめる
         articles_by_year = {}
         for article in articles:
-            articles_by_year[article.year] = {
+            year = article.year
+            article_data = {
                 "title": article.title,
                 "content": article.content,
                 "url": article.url,
             }
 
+            if year not in articles_by_year:
+                articles_by_year[year] = [article_data]
+            else:
+                articles_by_year[year].append(article_data)
+
         # プロンプトの構築
         prompt = f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
         prompt += "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。より具体的なエピソードや感想を含めると良いです。\n\n"
 
-        for year, article_data in sorted(articles_by_year.items(), reverse=True):
+        for year, article_list in sorted(articles_by_year.items(), reverse=True):
             prompt += f"## {year}年の記事\n"
-            prompt += f"タイトル: {article_data['title']}\n"
-            prompt += f"内容: {article_data['content'][:1000]}...\n\n"
+
+            for i, article_data in enumerate(article_list):
+                if i > 0:
+                    prompt += "\n--- 同じ日の別記事 ---\n"
+                prompt += f"タイトル: {article_data['title']}\n"
+                prompt += f"内容: {article_data['content'][:1000]}...\n"
+
+            prompt += "\n"
 
         prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
         prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"

@@ -137,7 +137,9 @@ def main() -> None:
             )
             sys.exit(1)
     else:
+        # 対象日時が指定されない場合は「一年前の今日」
         target_date = datetime.now()
+        target_date = target_date.replace(year=target_date.year - 1)
 
     # 非同期メイン処理の実行
     asyncio.run(
