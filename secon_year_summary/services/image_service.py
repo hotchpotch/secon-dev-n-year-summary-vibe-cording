@@ -98,12 +98,14 @@ async def create_summary_image(
                 date_text = f"{year}.{month:02d}.{day:02d}"
 
                 # テキストのサイズを取得
-                # textlengthはPIL 9.2.0以降で使えるが、古いバージョンではtextsize[0]を使う
                 try:
+                    # PIL 9.2.0以降の場合
                     text_width = draw.textlength(date_text, font=font)
-                    text_height = font.size
+                    text_height = font.getbbox(date_text)[3]  # フォントの高さを取得
                 except AttributeError:
-                    text_width, text_height = draw.textsize(date_text, font=font)
+                    # 古いバージョンの場合
+                    bbox = font.getbbox(date_text)
+                    text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
 
                 # 右下に配置するための座標
                 x = img.width - text_width - 10

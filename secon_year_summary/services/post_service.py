@@ -67,49 +67,65 @@ async def post_to_discord(
     content = f"**📅 {articles[0].month}月{articles[0].day}日のサマリー**\n\n"
     content += summary
 
-    # ファイルの準備
-    files = []
-    form_data = aiohttp.FormData()
+    # サマリーが長すぎないか確認（Discordの制限は2000文字）
+    if len(content) > 2000:
+        # 長すぎる場合は切り詰める
+        content = content[:1997] + "..."
 
-    if image_path and image_path.exists():
-        form_data.add_field(
-            "file",
-            open(image_path, "rb"),
-            filename=image_path.name,
-            content_type="image/png",
-        )
-        files.append({"id": 0, "description": "Generated summary image"})
+    try:
+        # ファイルの準備
+        form_data = aiohttp.FormData()
 
-    # webhookデータの準備
-    webhook_data = {
-        "content": content,
-        "embeds": [
-            {
-                "title": "メタデータ",
-                "description": metadata,
-                "color": 5814783,  # カラーコード（青色）
-            }
-        ],
-        "attachments": files,
-    }
+        if image_path and image_path.exists():
+            # 画像ファイルをバイナリモードで開く
+            with open(image_path, "rb") as img_file:
+                img_data = img_file.read()
 
-    # 投稿処理
-    async with aiohttp.ClientSession() as session:
-        if files:
-            # 画像ありの場合はマルチパートフォームデータとして送信
-            form_data.add_field("payload_json", json.dumps(webhook_data))
-            async with session.post(webhook_url, data=form_data) as response:
-                if response.status != 200:
-                    print(f"Discordへの投稿に失敗: {response.status}")
-                    return
-        else:
-            # 画像なしの場合はJSONとして送信
-            async with session.post(webhook_url, json=webhook_data) as response:
-                if response.status != 204:
-                    print(f"Discordへの投稿に失敗: {response.status}")
-                    return
+            # フォームデータに画像を追加
+            form_data.add_field(
+                "file",
+                img_data,
+                filename=image_path.name,
+                content_type="image/png",
+            )
 
-    print("Discordへの投稿に成功しました。")
+        # webhookデータの準備
+        webhook_data = {
+            "content": content,
+            "embeds": [
+                {
+                    "title": "メタデータ",
+                    "description": metadata,
+                    "color": 5814783,  # カラーコード（青色）
+                }
+            ],
+        }
+
+        # 投稿処理
+        async with aiohttp.ClientSession() as session:
+            if image_path and image_path.exists():
+                # 画像ありの場合はマルチパートフォームデータとして送信
+                form_data.add_field("payload_json", json.dumps(webhook_data))
+                async with session.post(webhook_url, data=form_data) as response:
+                    response_text = await response.text()
+                    if response.status not in [200, 204]:
+                        print(
+                            f"Discordへの投稿に失敗: ステータス {response.status}, レスポンス: {response_text}"
+                        )
+                        return
+            else:
+                # 画像なしの場合はJSONとして送信
+                async with session.post(webhook_url, json=webhook_data) as response:
+                    response_text = await response.text()
+                    if response.status not in [200, 204]:
+                        print(
+                            f"Discordへの投稿に失敗: ステータス {response.status}, レスポンス: {response_text}"
+                        )
+                        return
+
+        print("Discordへの投稿に成功しました。")
+    except Exception as e:
+        print(f"Discordへの投稿中にエラーが発生: {str(e)}")
 
 
 async def post_to_slack(
