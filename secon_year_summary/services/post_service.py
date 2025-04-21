@@ -10,9 +10,7 @@ import aiohttp
 from secon_year_summary.models.article import Article
 
 
-def post_to_stdout(
-    summary: str, articles: list[Article], image_path: Path | None
-) -> None:
+def post_to_stdout(summary: str, articles: list[Article], image_path: Path | None) -> None:
     """
     生成されたサマリーをSTDOUTに投稿（表示）する
 
@@ -31,7 +29,8 @@ def post_to_stdout(
     # メタデータ（URLs）を出力
     print("🔗 元記事リンク:")
     for article in sorted(articles, key=lambda a: a.year, reverse=True):
-        print(f"  • {article.year}年: {article.url}")
+        print(f"✦ {article.year}年: {article.title} / {article.date_str}")
+        print(f"{article.url}")
     print()
 
     # 画像情報の出力
@@ -39,9 +38,7 @@ def post_to_stdout(
         print(f"🖼️ サマリー画像が保存されました: {image_path}")
 
 
-async def post_to_discord(
-    summary: str, articles: list[Article], image_path: Path | None
-) -> None:
+async def post_to_discord(summary: str, articles: list[Article], image_path: Path | None) -> None:
     """
     生成されたサマリーをDiscordに投稿する
 
@@ -67,7 +64,7 @@ async def post_to_discord(
     # メタデータを構築（URLリスト）
     metadata = ""
     for article in sorted(articles, key=lambda a: a.year, reverse=True):
-        metadata += f"**{article.year}年:** {article.url}\n"
+        metadata += f"✦ **{article.year}年:** {article.title}\n{article.url}\n"
 
     # POSTするJSONデータを構築
     payload = {
@@ -86,10 +83,7 @@ async def post_to_discord(
             async with session.post(webhook_url, json=payload) as response:
                 if response.status not in [200, 204]:
                     response_text = await response.text()
-                    print(
-                        f"Discordへの投稿に失敗: ステータス {response.status}, "
-                        f"レスポンス: {response_text}"
-                    )
+                    print(f"Discordへの投稿に失敗: ステータス {response.status}, レスポンス: {response_text}")
                     return
 
             # 画像がある場合は、別途アップロード
@@ -100,10 +94,7 @@ async def post_to_discord(
                 async with session.post(webhook_url, data=data) as response:
                     if response.status not in [200, 204]:
                         response_text = await response.text()
-                        print(
-                            f"Discordへの投稿に失敗: ステータス {response.status}, "
-                            f"レスポンス: {response_text}"
-                        )
+                        print(f"Discordへの投稿に失敗: ステータス {response.status}, レスポンス: {response_text}")
                         return
 
         print("Discordへの投稿に成功しました。")
@@ -111,9 +102,7 @@ async def post_to_discord(
         print(f"Discordへの投稿中にエラーが発生: {e}")
 
 
-async def post_to_slack(
-    summary: str, articles: list[Article], image_path: Path | None
-) -> None:
+async def post_to_slack(summary: str, articles: list[Article], image_path: Path | None) -> None:
     """
     生成されたサマリーをSlackに投稿する
 
@@ -150,7 +139,7 @@ async def post_to_slack(
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"✦ *{article.year}年*: {article.title}\nURL: {article.url}",
+                    "text": f"✦ *{article.year}年*: {article.title} / {article.date_str}\n{article.url}",
                 },
             }
         )
@@ -170,9 +159,6 @@ async def post_to_slack(
     # 画像のアップロード（本来はSlack APIトークンが必要）
     # ここでは簡略化して、画像がある場合はその旨を表示するだけ
     if image_path and image_path.exists():
-        print(
-            f"Slackへの画像アップロードはこの実装ではサポートされていません。"
-            f"画像パス: {image_path}"
-        )
+        print(f"Slackへの画像アップロードはこの実装ではサポートされていません。画像パス: {image_path}")
 
     print("Slackへの投稿に成功しました。")
