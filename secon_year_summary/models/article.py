@@ -5,11 +5,11 @@ secon.dev の記事を取得・解析するためのモジュール
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional, Set
+from typing import List, Optional, cast
 from urllib.parse import urlparse
 
 import aiohttp
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 
 @dataclass
@@ -141,7 +141,8 @@ class ArticleFetcher:
             return None
 
         # 本文からスクリプトやスタイルを除外
-        for tag in content_tag.find_all(["script", "style"]):
+        content_tag_as_tag = cast(Tag, content_tag)
+        for tag in content_tag_as_tag.find_all(["script", "style"]):
             tag.decompose()
 
         content = content_tag.get_text(strip=True)
@@ -149,8 +150,10 @@ class ArticleFetcher:
         # OG画像の抽出
         image_url = None
         og_image = soup.find("meta", property="og:image")
-        if og_image and "content" in og_image.attrs:
-            image_url = og_image["content"]
+        if og_image:
+            og_image_tag = cast(Tag, og_image)
+            if og_image_tag.has_attr("content"):
+                image_url = str(og_image_tag["content"])
 
         # 過去の記事URLの抽出
         n_diary_urls = self._extract_related_urls(soup, url)
@@ -170,7 +173,8 @@ class ArticleFetcher:
         """関連記事のURLを抽出する"""
         hrefs = []
         for tag in soup.select(".similar-entries .similar-thumb-entry div > a"):
-            href = tag.get("href")
+            tag_obj = cast(Tag, tag)
+            href = tag_obj.get("href")
             if href and isinstance(href, str):
                 # 相対URLの場合は絶対URLに変換
                 parsed_url = urlparse(current_url)

@@ -1,17 +1,16 @@
 #!/usr/bin/env python
 import argparse
 import asyncio
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from dotenv import load_dotenv
 
 from secon_year_summary.models.article import ArticleFetcher
 from secon_year_summary.services.image_service import create_summary_image
-from secon_year_summary.services.llm_service import LLMService, get_llm_service
+from secon_year_summary.services.llm_service import get_llm_service
 from secon_year_summary.services.post_service import (
     post_to_discord,
     post_to_slack,
@@ -133,7 +132,7 @@ def main() -> None:
             target_date = datetime.strptime(args.date, "%Y-%m-%d")
         except ValueError:
             print(
-                f"エラー: 日付の形式が正しくありません。YYYY-MM-DD形式で指定してください。"
+                "エラー: 日付の形式が正しくありません。YYYY-MM-DD形式で指定してください。"
             )
             sys.exit(1)
     else:

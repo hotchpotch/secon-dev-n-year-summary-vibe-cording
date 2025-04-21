@@ -7,7 +7,7 @@ import io
 import math
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, List, Optional, cast
 
 import aiohttp
 from PIL import Image, ImageDraw, ImageFont
@@ -113,7 +113,8 @@ async def create_summary_image(
     images_with_dates = []
     for data, date_info in successful_downloads:
         try:
-            img = Image.open(io.BytesIO(data))
+            # PILのImageオブジェクトに型キャスト
+            img = cast(Image.Image, Image.open(io.BytesIO(data)))
 
             # まず3:2のアスペクト比にクリッピング
             img = crop_to_aspect_ratio(img, 3 / 2)
@@ -122,7 +123,9 @@ async def create_summary_image(
             img.thumbnail(UNIFORM_SIZE)
 
             # 正確に指定サイズにするために新しいキャンバスにリサイズした画像を配置
-            canvas = Image.new("RGBA", UNIFORM_SIZE, (51, 51, 51, 255))
+            canvas = cast(
+                Image.Image, Image.new("RGBA", UNIFORM_SIZE, (51, 51, 51, 255))
+            )
             paste_x = (UNIFORM_SIZE[0] - img.width) // 2
             paste_y = (UNIFORM_SIZE[1] - img.height) // 2
             canvas.paste(img, (paste_x, paste_y))
@@ -135,10 +138,10 @@ async def create_summary_image(
 
                 try:
                     # フォントの設定
-                    font = ImageFont.truetype("Arial", 12)
+                    font = cast(Any, ImageFont.truetype("Arial", 12))
                 except IOError:
                     # フォントが見つからない場合はデフォルトフォントを使用
-                    font = ImageFont.load_default()
+                    font = cast(Any, ImageFont.load_default())
 
                 # 日付テキスト
                 date_text = f"{year}.{month:02d}.{day:02d}"
@@ -214,8 +217,8 @@ async def create_summary_image(
     height = rows * img_height
 
     # 新しい画像を作成
-    result = Image.new(
-        "RGB", (width, height), color=(51, 51, 51)
+    result = cast(
+        Image.Image, Image.new("RGB", (width, height), color=(51, 51, 51))
     )  # ダークグレー #333333
 
     # 画像を配置
@@ -232,7 +235,7 @@ async def create_summary_image(
         # RGBAモードの画像はRGBに変換してから貼り付ける
         if img.mode == "RGBA":
             # 背景色を使って透明部分を塗りつぶす
-            background = Image.new("RGB", img.size, (51, 51, 51))
+            background = cast(Image.Image, Image.new("RGB", img.size, (51, 51, 51)))
             background.paste(
                 img, mask=img.split()[3]
             )  # マスクとしてアルファチャンネルを使用

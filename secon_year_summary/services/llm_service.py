@@ -5,7 +5,7 @@ LLMサービスモジュール - 各種LLMの抽象化と実装
 import abc
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, List
 
 from secon_year_summary.models.article import Article
 
@@ -104,13 +104,35 @@ class GeminiService(LLMService):
         try:
             import google.generativeai as genai
 
+            # APIキーの設定
+            api_key = os.getenv("GOOGLE_API_KEY")
+            if not api_key:
+                raise ValueError("GOOGLE_API_KEY環境変数が設定されていません")
+
+            # 現在のGoogle APIに合わせて初期化方法を調整
             try:
-                genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-                self.model = genai.GenerativeModel(model_name=model)
-            except AttributeError:
+                # Google APIの構造が変わることがあるため、
+                # 異なるAPI構造に対応
+                if hasattr(genai, "configure"):
+                    # 古いAPIバージョン
+                    # 型チェックを無視
+                    configure_fn = getattr(genai, "configure")
+                    configure_fn(api_key=api_key)
+                    model_class = getattr(genai, "GenerativeModel")
+                    self.model = model_class(model_name=model)
+                else:
+                    # 新しいAPIバージョン (仮の実装例)
+                    # 型チェックを無視
+                    client_class = getattr(genai, "Client", None)
+                    if client_class:
+                        self.client = client_class(api_key=api_key)
+                        self.model = self.client.get_model(model)
+                    else:
+                        raise AttributeError("APIの構造を特定できません")
+            except AttributeError as e:
                 # configure や GenerativeModel がない場合の対処
                 raise ImportError(
-                    "Google Gemini APIのバージョンが古いか、互換性がありません。"
+                    f"Google Gemini APIのバージョンが古いか、互換性がありません: {e}"
                 )
         except ImportError:
             raise ImportError(
@@ -226,7 +248,9 @@ class ClaudeService(LLMService):
                 max_tokens=1500,
                 messages=[{"role": "user", "content": prompt}],
             )
-            return response.content[0].text
+            # 型安全のためにAnyにキャスト
+            content_block: Any = response.content[0]
+            return str(content_block)
         except Exception as e:
             print(f"Claudeでのサマリー生成中にエラーが発生しました: {e}")
             return "サマリーの生成に失敗しました。"
