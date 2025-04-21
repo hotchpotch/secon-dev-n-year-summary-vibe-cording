@@ -1,0 +1,51 @@
+name: Scheduled Summary
+
+on:
+  schedule:
+    # JST 午前1時 (UTC 16時) に毎日実行
+    - cron: "0 16 * * *"
+  # 手動実行も可能にする
+  workflow_dispatch:
+
+jobs:
+  run_summary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # astral-sh/setup-uv@v5 を使用し、uv のインストール、Python セットアップ、キャッシュを統合
+      - name: Install uv, set up Python, and cache dependencies
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.6.14"
+          # uv のバージョンを指定する (任意だが推奨)
+          # version: "latest" # または "0.6.14" のような特定のバージョン
+          # Python のバージョンをここで指定
+          python-version: "3.12" # specification.md に合わせたバージョン
+          # キャッシュを有効化
+          enable-cache: true
+          # pyproject.toml または uv.lock が変更されたらキャッシュを無効化
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
+
+      # uv sync で依存関係をインストール (キャッシュが効いていれば高速)
+      - name: Install dependencies
+        run: uv sync
+        # env:
+        #   # uv syncが内部で使う可能性のある環境変数 (必要に応じて)
+        #   UV_EXTRA_INDEX_URL: ${{ secrets.UV_EXTRA_INDEX_URL }}
+
+      # uv run でスクリプトを実行
+      - name: Run summary script
+        run: uv run secon-year-summary --model gemini/gemini-2.5-flash-preview-04-17 -v --post-to discord
+        env:
+          # GitHub リポジトリの Secrets に GOOGLE_API_KEY を設定してください
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          # GitHub リポジトリの Secrets に DISCORD_WEBHOOK_URL を設定してください
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          # 他に必要な Secret があれば同様に追加します (OpenAI を使う場合はコメント解除)
+          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          # SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
