@@ -27,6 +27,35 @@ async def download_image(session: aiohttp.ClientSession, url: str) -> Optional[b
         return None
 
 
+def crop_to_aspect_ratio(img: Image.Image, target_ratio: float = 3 / 2) -> Image.Image:
+    """
+    画像を指定されたアスペクト比（デフォルト3:2）になるようにクリッピングする
+
+    Args:
+        img: 入力画像
+        target_ratio: 目標のアスペクト比（幅/高さ）
+
+    Returns:
+        クリッピングされた画像
+    """
+    width, height = img.size
+    current_ratio = width / height
+
+    if current_ratio > target_ratio:
+        # 幅が広すぎる場合は左右をクリッピング
+        new_width = int(height * target_ratio)
+        left = (width - new_width) // 2
+        return img.crop((left, 0, left + new_width, height))
+    elif current_ratio < target_ratio:
+        # 高さが高すぎる場合は上下をクリッピング
+        new_height = int(width / target_ratio)
+        top = (height - new_height) // 2
+        return img.crop((0, top, width, top + new_height))
+
+    # すでに指定された比率なら変更なし
+    return img
+
+
 async def create_summary_image(
     articles: List[Article], target_date: datetime, output_path: Path
 ) -> Optional[Path]:
@@ -75,18 +104,35 @@ async def create_summary_image(
         print("画像のダウンロードに失敗しました。")
         return None
 
+    # 統一サイズを設定（3:2アスペクト比）
+    THUMBNAIL_WIDTH = 300
+    THUMBNAIL_HEIGHT = 200  # 3:2比率で高さは200px
+    UNIFORM_SIZE = (THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT)
+
     # 画像の読み込みと日付の追加
     images_with_dates = []
     for data, date_info in successful_downloads:
         try:
             img = Image.open(io.BytesIO(data))
-            # サイズを統一（サムネイルサイズに）
-            img.thumbnail((300, 300))
+
+            # まず3:2のアスペクト比にクリッピング
+            img = crop_to_aspect_ratio(img, 3 / 2)
+
+            # クリッピングした画像をサムネイルサイズに変換
+            img.thumbnail(UNIFORM_SIZE)
+
+            # 正確に指定サイズにするために新しいキャンバスにリサイズした画像を配置
+            canvas = Image.new("RGBA", UNIFORM_SIZE, (51, 51, 51, 255))
+            paste_x = (UNIFORM_SIZE[0] - img.width) // 2
+            paste_y = (UNIFORM_SIZE[1] - img.height) // 2
+            canvas.paste(img, (paste_x, paste_y))
+            img = canvas
 
             # 日付情報を追加（右下、オレンジ色、半透明、小さめ）
             if date_info:
                 year, month, day = date_info
-                draw = ImageDraw.Draw(img, "RGBA")  # "RGBA"モードを使って透明度を設定
+                draw = ImageDraw.Draw(img)
+
                 try:
                     # フォントの設定
                     font = ImageFont.truetype("Arial", 12)
@@ -119,8 +165,8 @@ async def create_summary_image(
                     fill=(255, 128, 0, 180),  # オレンジ色、透明度180/255
                 )
 
-                # 日付情報と画像を格納
-                images_with_dates.append((img, date_info))
+            # 日付情報と画像を格納（日付情報がない場合でも画像は格納する）
+            images_with_dates.append((img, date_info if date_info else (0, 0, 0)))
         except Exception as e:
             print(f"画像の処理に失敗しました: {e}")
 
@@ -159,9 +205,9 @@ async def create_summary_image(
         cols = math.ceil(math.sqrt(num_images))
         rows = math.ceil(num_images / cols)
 
-    # 画像の幅と高さを取得（均一サイズを前提）
-    img_width = images[0].width
-    img_height = images[0].height
+    # 画像の幅と高さを取得（すべて同じサイズ）
+    img_width = UNIFORM_SIZE[0]
+    img_height = UNIFORM_SIZE[1]
 
     # 全体の画像サイズを計算
     width = cols * img_width
@@ -182,6 +228,15 @@ async def create_summary_image(
 
         x = col * img_width
         y = row * img_height
+
+        # RGBAモードの画像はRGBに変換してから貼り付ける
+        if img.mode == "RGBA":
+            # 背景色を使って透明部分を塗りつぶす
+            background = Image.new("RGB", img.size, (51, 51, 51))
+            background.paste(
+                img, mask=img.split()[3]
+            )  # マスクとしてアルファチャンネルを使用
+            img = background
 
         result.paste(img, (x, y))
 
