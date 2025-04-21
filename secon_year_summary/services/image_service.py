@@ -212,7 +212,7 @@ async def create_summary_image(articles: list[Article], target_date: datetime, o
         rows = math.ceil(num_images / cols)
 
     # マージンとパディングの設定
-    padding = 3  # 画像間のパディング
+    padding = 0  # 画像間のパディング
     canvas_width = cols * THUMBNAIL_WIDTH + (cols - 1) * padding
     canvas_height = rows * THUMBNAIL_HEIGHT + (rows - 1) * padding
 
