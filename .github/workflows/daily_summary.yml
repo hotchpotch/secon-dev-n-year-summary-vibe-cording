@@ -1,4 +1,4 @@
-name: Scheduled Summary
+name: Daily Summary
 
 on:
   schedule:
@@ -39,7 +39,7 @@ jobs:
 
       # uv run でスクリプトを実行
       - name: Run summary script
-        run: uv run secon-year-summary --model gemini/gemini-2.5-flash-preview-04-17 -v --post-to discord
+        run: uv run secon-year-summary --model gemini/gemini-2.5-flash-preview-04-17 -v -p discord
         env:
           # GitHub リポジトリの Secrets に GOOGLE_API_KEY を設定してください
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
