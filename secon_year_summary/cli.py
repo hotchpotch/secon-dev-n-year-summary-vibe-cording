@@ -4,7 +4,6 @@ import asyncio
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import List
 
 from dotenv import load_dotenv
 
@@ -22,7 +21,7 @@ async def main_async(
     target_date: datetime,
     model_name: str,
     years_back: int,
-    post_to: List[str],
+    post_to: list[str],
     verbose: bool,
 ) -> None:
     """非同期メイン処理"""

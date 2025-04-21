@@ -1,11 +1,9 @@
 """
-投稿サービスモジュール - Discord、Slack、標準出力への投稿機能
+投稿サービスモジュール - Discord, Slack, stdout への投稿
 """
 
-import json
 import os
 from pathlib import Path
-from typing import List, Optional
 
 import aiohttp
 
@@ -13,144 +11,139 @@ from secon_year_summary.models.article import Article
 
 
 def post_to_stdout(
-    summary: str, articles: List[Article], image_path: Optional[Path]
+    summary: str, articles: list[Article], image_path: Path | None
 ) -> None:
     """
-    標準出力に投稿する
+    生成されたサマリーをSTDOUTに投稿（表示）する
 
     Args:
-        summary: サマリー文字列
+        summary: 生成されたサマリーテキスト
         articles: 記事リスト
-        image_path: 画像パス
+        image_path: サマリー画像のパス（あれば）
     """
-    print("\n" + "-" * 50)
+    # サマリーを出力
+    print("\n" + "=" * 50)
+    print("📝 生成されたサマリー:")
+    print("=" * 50)
     print(summary)
-    print("-" * 50)
+    print("=" * 50 + "\n")
 
-    print("\n📊 メタデータ")
-    print("-" * 50)
+    # メタデータ（URLs）を出力
+    print("🔗 元記事リンク:")
     for article in sorted(articles, key=lambda a: a.year, reverse=True):
-        print(f"✦ {article.year}年: {article.title}")
-        print(f"  URL: {article.url}")
-    print("-" * 50)
+        print(f"  • {article.year}年: {article.url}")
+    print()
 
-    if image_path:
-        print(f"\n🖼️ 画像: {image_path}")
-        print("-" * 50)
+    # 画像情報の出力
+    if image_path and image_path.exists():
+        print(f"🖼️ サマリー画像が保存されました: {image_path}")
 
 
 async def post_to_discord(
-    summary: str, articles: List[Article], image_path: Optional[Path]
+    summary: str, articles: list[Article], image_path: Path | None
 ) -> None:
     """
-    Discordに投稿する
+    生成されたサマリーをDiscordに投稿する
 
     Args:
-        summary: サマリー文字列
+        summary: 生成されたサマリーテキスト
         articles: 記事リスト
-        image_path: 画像パス
+        image_path: サマリー画像のパス（あれば）
     """
     webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
     if not webhook_url:
-        print("Discordへの投稿に失敗: DISCORD_WEBHOOK_URL が設定されていません。")
+        print("Discord WebHook URLが設定されていません。")
         return
 
-    # メタデータ部分の作成
-    metadata = ""
-    for article in sorted(articles, key=lambda a: a.year, reverse=True):
-        metadata += f"✦ **{article.year}年**: {article.title}\n"
-        metadata += f"{article.url}\n"
-
-    # 投稿内容の作成
+    # サマリーテキストの準備
     content = summary
 
     # サマリーが長すぎないか確認（Discordの制限は2000文字）
-    if len(content) > 2000:
+    MAX_CONTENT_LENGTH = 2000
+    if len(content) > MAX_CONTENT_LENGTH:
         # 長すぎる場合は切り詰める
-        content = content[:1997] + "..."
+        content = content[: MAX_CONTENT_LENGTH - 3] + "..."
+
+    # メタデータを構築（URLリスト）
+    metadata = ""
+    for article in sorted(articles, key=lambda a: a.year, reverse=True):
+        metadata += f"**{article.year}年:** {article.url}\n"
+
+    # POSTするJSONデータを構築
+    payload = {
+        "content": content,
+        "embeds": [
+            {
+                "description": metadata,
+                "color": 5814783,  # カラーコード（青色）
+            }
+        ],
+    }
 
     try:
-        # ファイルの準備
-        form_data = aiohttp.FormData()
-
-        if image_path and image_path.exists():
-            # 画像ファイルをバイナリモードで開く
-            with open(image_path, "rb") as img_file:
-                img_data = img_file.read()
-
-            # フォームデータに画像を追加
-            form_data.add_field(
-                "file",
-                img_data,
-                filename=image_path.name,
-                content_type="image/png",
-            )
-
-        # webhookデータの準備
-        webhook_data = {
-            "content": content,
-            "embeds": [
-                {
-                    "description": metadata,
-                    "color": 5814783,  # カラーコード（青色）
-                }
-            ],
-        }
-
-        # 投稿処理
+        # サマリーテキストを投稿
         async with aiohttp.ClientSession() as session:
+            async with session.post(webhook_url, json=payload) as response:
+                if response.status not in [200, 204]:
+                    response_text = await response.text()
+                    print(
+                        f"Discordへの投稿に失敗: ステータス {response.status}, "
+                        f"レスポンス: {response_text}"
+                    )
+                    return
+
+            # 画像がある場合は、別途アップロード
             if image_path and image_path.exists():
-                # 画像ありの場合はマルチパートフォームデータとして送信
-                form_data.add_field("payload_json", json.dumps(webhook_data))
-                async with session.post(webhook_url, data=form_data) as response:
-                    response_text = await response.text()
+                data = aiohttp.FormData()
+                data.add_field("file", open(image_path, "rb"), filename=image_path.name)
+
+                async with session.post(webhook_url, data=data) as response:
                     if response.status not in [200, 204]:
+                        response_text = await response.text()
                         print(
-                            f"Discordへの投稿に失敗: ステータス {response.status}, レスポンス: {response_text}"
-                        )
-                        return
-            else:
-                # 画像なしの場合はJSONとして送信
-                async with session.post(webhook_url, json=webhook_data) as response:
-                    response_text = await response.text()
-                    if response.status not in [200, 204]:
-                        print(
-                            f"Discordへの投稿に失敗: ステータス {response.status}, レスポンス: {response_text}"
+                            f"Discordへの投稿に失敗: ステータス {response.status}, "
+                            f"レスポンス: {response_text}"
                         )
                         return
 
         print("Discordへの投稿に成功しました。")
     except Exception as e:
-        print(f"Discordへの投稿中にエラーが発生: {str(e)}")
+        print(f"Discordへの投稿中にエラーが発生: {e}")
 
 
 async def post_to_slack(
-    summary: str, articles: List[Article], image_path: Optional[Path]
+    summary: str, articles: list[Article], image_path: Path | None
 ) -> None:
     """
-    Slackに投稿する
+    生成されたサマリーをSlackに投稿する
 
     Args:
-        summary: サマリー文字列
+        summary: 生成されたサマリーテキスト
         articles: 記事リスト
-        image_path: 画像パス
+        image_path: サマリー画像のパス（あれば）
     """
     webhook_url = os.getenv("SLACK_WEBHOOK_URL")
     if not webhook_url:
-        print("Slackへの投稿に失敗: SLACK_WEBHOOK_URL が設定されていません。")
+        print("Slack WebHook URLが設定されていません。")
         return
 
-    # Slack用のメッセージブロック
+    # Slackのブロック形式のメッセージを構築
     blocks = [
-        {"type": "section", "text": {"type": "mrkdwn", "text": summary}},
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*secon.dev 年間サマリー*\n\n{summary}",
+            },
+        },
         {"type": "divider"},
         {
             "type": "header",
-            "text": {"type": "plain_text", "text": "📊 メタデータ", "emoji": True},
+            "text": {"type": "plain_text", "text": "元記事リンク 🔗", "emoji": True},
         },
     ]
 
-    # メタデータの追加
+    # 各記事へのリンクをブロックに追加
     for article in sorted(articles, key=lambda a: a.year, reverse=True):
         blocks.append(
             {
@@ -162,22 +155,12 @@ async def post_to_slack(
             }
         )
 
-    # 画像の投稿準備
-    if image_path and image_path.exists():
-        # 画像を投稿する場合はSlackのファイルアップロードAPIを使用
-        # 一般的なWebhookからは直接ファイルを投稿できないため、
-        # 画像があることを知らせるメッセージを追加
-        blocks.append(
-            {
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": "🖼️ 画像は別途アップロードされます"},
-            }
-        )
+    # Slackに投稿するペイロードを構築
+    payload = {
+        "blocks": blocks,
+    }
 
-    # メッセージペイロード
-    payload = {"blocks": blocks}
-
-    # 投稿処理
+    # Slackに投稿
     async with aiohttp.ClientSession() as session:
         async with session.post(webhook_url, json=payload) as response:
             if response.status != 200:
@@ -188,7 +171,8 @@ async def post_to_slack(
     # ここでは簡略化して、画像がある場合はその旨を表示するだけ
     if image_path and image_path.exists():
         print(
-            f"Slackへの画像アップロードはこの実装ではサポートされていません。画像パス: {image_path}"
+            f"Slackへの画像アップロードはこの実装ではサポートされていません。"
+            f"画像パス: {image_path}"
         )
 
     print("Slackへの投稿に成功しました。")

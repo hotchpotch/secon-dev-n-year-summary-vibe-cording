@@ -2,7 +2,6 @@
 画像サービスのテスト
 """
 
-import asyncio
 import io
 from datetime import datetime
 from pathlib import Path

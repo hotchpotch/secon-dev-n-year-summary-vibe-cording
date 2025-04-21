@@ -7,9 +7,9 @@ name = "secon-year-summary"
 version = "0.1.0"
 description = "secon.dev年間サマリー生成ツール"
 requires-python = ">=3.12"
+license = {text = "MIT"}
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
@@ -23,5 +23,38 @@ dependencies = [
     "asyncio",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.3.1",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.2.0",
+]
+
 [project.scripts]
-secon-year-summary = "secon_year_summary.cli:main" 
+secon-year-summary = "secon_year_summary.cli:main"
+
+[tool.setuptools]
+packages = ["secon_year_summary"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "B", "UP", "PL", "RUF"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.ruff.lint.isort]
+known-first-party = ["secon_year_summary"]
+
+[tool.pyright]
+include = ["secon_year_summary", "tests"]
+typeCheckingMode = "strict"
+reportMissingImports = true
+reportMissingTypeStubs = false
+pythonVersion = "3.12" 

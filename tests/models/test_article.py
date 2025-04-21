@@ -2,13 +2,10 @@
 ArticleFetcherのテスト
 """
 
-import asyncio
 from datetime import datetime
 from unittest import mock
 
 import pytest
-from aiohttp import ClientSession
-from bs4 import BeautifulSoup
 
 from secon_year_summary.models.article import Article, ArticleFetcher
 

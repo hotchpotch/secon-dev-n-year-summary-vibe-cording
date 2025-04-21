@@ -1,7 +1,6 @@
-import asyncio
 import unittest
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 from bs4 import BeautifulSoup
 

@@ -7,7 +7,6 @@ import io
 import math
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Optional, cast
 
 import aiohttp
 from PIL import Image, ImageDraw, ImageFont
@@ -15,7 +14,7 @@ from PIL import Image, ImageDraw, ImageFont
 from secon_year_summary.models.article import Article
 
 
-async def download_image(session: aiohttp.ClientSession, url: str) -> Optional[bytes]:
+async def download_image(session: aiohttp.ClientSession, url: str) -> bytes | None:
     """画像URLから画像データを非同期でダウンロードする"""
     try:
         async with session.get(url) as response:
@@ -57,8 +56,8 @@ def crop_to_aspect_ratio(img: Image.Image, target_ratio: float = 3 / 2) -> Image
 
 
 async def create_summary_image(
-    articles: List[Article], target_date: datetime, output_path: Path
-) -> Optional[Path]:
+    articles: list[Article], target_date: datetime, output_path: Path
+) -> Path | None:
     """
     記事リストから年間サマリー画像を生成する
 
@@ -72,7 +71,9 @@ async def create_summary_image(
     """
     # 画像URLの収集（重複を除外）
     image_urls = set()
-    article_dates = {}  # 画像URLと記事の年月日を関連付ける辞書
+    article_dates: dict[
+        str, tuple[int, int, int]
+    ] = {}  # 画像URLと記事の年月日を関連付ける辞書
 
     for article in articles:
         if article.image_url:
@@ -94,7 +95,7 @@ async def create_summary_image(
         image_data_list = await asyncio.gather(*tasks)
 
     # 成功したダウンロードのみフィルタリング
-    successful_downloads = []
+    successful_downloads: list[tuple[bytes, tuple[int, int, int] | None]] = []
     for i, data in enumerate(image_data_list):
         if data:
             url = list(image_urls)[i]
@@ -110,11 +111,11 @@ async def create_summary_image(
     UNIFORM_SIZE = (THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT)
 
     # 画像の読み込みと日付の追加
-    images_with_dates = []
+    images_with_dates: list[tuple[Image.Image, tuple[int, int, int]]] = []
     for data, date_info in successful_downloads:
         try:
-            # PILのImageオブジェクトに型キャスト
-            img = cast(Image.Image, Image.open(io.BytesIO(data)))
+            # PILのImageオブジェクトを作成
+            img = Image.open(io.BytesIO(data))
 
             # まず3:2のアスペクト比にクリッピング
             img = crop_to_aspect_ratio(img, 3 / 2)
@@ -123,9 +124,7 @@ async def create_summary_image(
             img.thumbnail(UNIFORM_SIZE)
 
             # 正確に指定サイズにするために新しいキャンバスにリサイズした画像を配置
-            canvas = cast(
-                Image.Image, Image.new("RGBA", UNIFORM_SIZE, (51, 51, 51, 255))
-            )
+            canvas = Image.new("RGBA", UNIFORM_SIZE, (51, 51, 51, 255))
             paste_x = (UNIFORM_SIZE[0] - img.width) // 2
             paste_y = (UNIFORM_SIZE[1] - img.height) // 2
             canvas.paste(img, (paste_x, paste_y))
@@ -138,10 +137,10 @@ async def create_summary_image(
 
                 try:
                     # フォントの設定
-                    font = cast(Any, ImageFont.truetype("Arial", 12))
-                except IOError:
+                    font = ImageFont.truetype("Arial", 12)
+                except OSError:
                     # フォントが見つからない場合はデフォルトフォントを使用
-                    font = cast(Any, ImageFont.load_default())
+                    font = ImageFont.load_default()
 
                 # 日付テキスト
                 date_text = f"{year}.{month:02d}.{day:02d}"
@@ -150,11 +149,20 @@ async def create_summary_image(
                 try:
                     # PIL 9.2.0以降の場合
                     text_width = draw.textlength(date_text, font=font)
-                    text_height = font.getbbox(date_text)[3]  # フォントの高さを取得
+                    text_bbox = font.getbbox(date_text)
+                    text_height = (
+                        text_bbox[3] if text_bbox else 12
+                    )  # フォントの高さを取得
                 except AttributeError:
                     # 古いバージョンの場合
-                    bbox = font.getbbox(date_text)
-                    text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                    text_bbox = font.getbbox(date_text)
+                    if text_bbox:
+                        text_width, text_height = (
+                            text_bbox[2] - text_bbox[0],
+                            text_bbox[3] - text_bbox[1],
+                        )
+                    else:
+                        text_width, text_height = 80, 12  # デフォルト値
 
                 # 右下に配置するための座標
                 x = img.width - text_width - 10
@@ -169,7 +177,8 @@ async def create_summary_image(
                 )
 
             # 日付情報と画像を格納（日付情報がない場合でも画像は格納する）
-            images_with_dates.append((img, date_info if date_info else (0, 0, 0)))
+            date_tuple = date_info if date_info else (0, 0, 0)
+            images_with_dates.append((img, date_tuple))
         except Exception as e:
             print(f"画像の処理に失敗しました: {e}")
 
@@ -201,50 +210,33 @@ async def create_summary_image(
         rows, cols = 2, 3
     elif num_images <= 9:
         rows, cols = 3, 3
-    elif num_images <= 12:
-        rows, cols = 3, 4
     else:
-        # それ以上の場合、ほぼ正方形に近いグリッドを作成
-        cols = math.ceil(math.sqrt(num_images))
+        # 9より多い場合は適切な行数と列数を計算
+        cols = min(int(math.ceil(math.sqrt(num_images))), 4)  # 最大4列までに制限
         rows = math.ceil(num_images / cols)
 
-    # 画像の幅と高さを取得（すべて同じサイズ）
-    img_width = UNIFORM_SIZE[0]
-    img_height = UNIFORM_SIZE[1]
+    # マージンとパディングの設定
+    padding = 3  # 画像間のパディング
+    canvas_width = cols * THUMBNAIL_WIDTH + (cols - 1) * padding
+    canvas_height = rows * THUMBNAIL_HEIGHT + (rows - 1) * padding
 
-    # 全体の画像サイズを計算
-    width = cols * img_width
-    height = rows * img_height
+    # 背景色（ダークグレー）
+    bg_color = (51, 51, 51, 255)  # RGB + alpha
 
-    # 新しい画像を作成
-    result = cast(
-        Image.Image, Image.new("RGB", (width, height), color=(51, 51, 51))
-    )  # ダークグレー #333333
+    # 画像の合成
+    canvas = Image.new("RGBA", (canvas_width, canvas_height), bg_color)
 
-    # 画像を配置
-    for i, img in enumerate(images):
-        if i >= rows * cols:
-            break  # グリッドに収まる数だけ処理
-
+    # 画像の配置（グリッドレイアウト）
+    for i, img in enumerate(images[: rows * cols]):  # 最大行×列の画像だけ配置
         row = i // cols
         col = i % cols
+        x = col * (THUMBNAIL_WIDTH + padding)
+        y = row * (THUMBNAIL_HEIGHT + padding)
+        canvas.paste(img, (x, y))
 
-        x = col * img_width
-        y = row * img_height
-
-        # RGBAモードの画像はRGBに変換してから貼り付ける
-        if img.mode == "RGBA":
-            # 背景色を使って透明部分を塗りつぶす
-            background = cast(Image.Image, Image.new("RGB", img.size, (51, 51, 51)))
-            background.paste(
-                img, mask=img.split()[3]
-            )  # マスクとしてアルファチャンネルを使用
-            img = background
-
-        result.paste(img, (x, y))
-
-    # 画像の保存
+    # PNG形式で保存
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    result.save(output_path)
+    canvas = canvas.convert("RGB")  # RGBモードに変換（PNGで透明度が必要なければ）
+    canvas.save(output_path, format="PNG")
 
     return output_path
