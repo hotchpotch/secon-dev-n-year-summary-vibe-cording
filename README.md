@@ -77,16 +77,7 @@ $ uv run secon-year-summary --model google/gemini-1.5-flash-latest -v -d 2024-01
    source .venv/bin/activate
 
    # 依存関係を同期
-   uv sync
-   ```
-
-   または `pip` を使用する場合:
-
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -e .[dev] # 開発用依存関係も含む場合
-   # pip install -e .
+   uv sync --all-extras
    ```
 
 ## 設定
@@ -200,17 +191,15 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **テスト:** `pytest` を使用します。
 
   ```bash
-  uv run pytest
+  pytest
   ```
 
 - **フォーマット & Lint:** `ruff` と `pyright` を使用します。
 
   ```bash
-  # フォーマット
-  uv run ruff format .
-  # Lint
-  uv run ruff check .
-  uv run pyright
+  ruff format .
+  ruff check .
+  pyright
   ```
 
 ## ライセンス
