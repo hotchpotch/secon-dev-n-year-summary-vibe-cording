@@ -1,92 +1,137 @@
 # secon-year-summary
 
-secon.dev サイトの日記を読み込み、同日に書かれた過去の記事をまとめて年間サマリーを生成するツールです。
+secon.dev サイトの日記を読み込み、指定された日付と同日に書かれた過去の記事をまとめて年間サマリーを生成するツールです。
+
+[詳細な仕様はこちら](docs/specification.md)
+
+## 特徴
+
+- 特定の日付の過去記事（デフォルトは1年前の今日）を自動で収集
+- 複数のLLM（OpenAI, Gemini, Claude）を選択してサマリーを生成
+- 生成されたサマリーと記事の画像をDiscord, Slack, または標準出力に投稿
+- 記事の画像（OGP画像）をまとめて1枚の画像に生成
 
 ## インストール
 
-```bash
-# uv を使ったインストール（推奨）
-uv pip install -e .
+1. リポジトリをクローンします:
+   ```bash
+   git clone https://github.com/hotchpotch/secon-dev-n-year-summary-vibe-cording.git
+   cd secon-dev-n-year-summary-vibe-cording
+   ```
 
-# または pip でもインストール可能
-pip install -e .
+2. 依存関係をインストールします:
+   - [uv](https://github.com/astral-sh/uv) がインストールされている必要があります。
+   ```bash
+   # 仮想環境を作成 (推奨)
+   uv venv
+   source .venv/bin/activate
+
+   # 依存関係を同期
+   uv sync
+   ```
+   または `pip` を使用する場合:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -e .[dev] # 開発用依存関係も含む場合
+   # pip install -e .
+   ```
+
+## 設定
+
+プロジェクトルートに `.env` ファイルを作成し、必要な環境変数を設定します。
+
+```dotenv
+# .envファイル の例
+
+# --- APIキー (使用するLLMに応じて設定) ---
+OPENAI_API_KEY=sk-...
+GOOGLE_API_KEY=AIzaSy...
+ANTHROPIC_API_KEY=sk-ant-api03-...
+
+# --- Webhook URL (投稿先に応じて設定) ---
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+
+# --- その他 (必要に応じて) ---
+# 例: プロキシ設定など
+# HTTP_PROXY=http://proxy.example.com:8080
+# HTTPS_PROXY=https://proxy.example.com:8080
 ```
+
+- 各種APIキーは、利用するLLMサービスのものを設定してください。
+- DiscordやSlackに投稿する場合は、それぞれのWebhook URLを設定してください。設定方法は各サービスのドキュメントを参照してください。
 
 ## 使い方
 
-```bash
-# 基本的な使い方（今日の日付の記事を対象に）
-secon-year-summary
-
-# 特定の日付の記事を対象に
-secon-year-summary --date 2024-04-29
-
-# 使用するLLMモデルを指定
-secon-year-summary --model openai/gpt-4.1-nano
-
-# Discordに投稿
-secon-year-summary --post discord
-
-# Slackに投稿
-secon-year-summary --post slack
-
-# 複数の投稿先に送信
-secon-year-summary --post discord --post slack
-```
-
-## 環境変数
-
-`.env` ファイルに以下の変数を設定します：
-
-```
-# OpenAI API
-OPENAI_API_KEY=your_openai_api_key
-
-# Google Gemini API
-GOOGLE_API_KEY=your_google_api_key
-
-# Anthropic Claude API
-ANTHROPIC_API_KEY=your_anthropic_api_key
-
-# Discord Webhook URL
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your_webhook_id/your_webhook_token
-
-# Slack Webhook URL
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/your_slack_webhook_path
-```
-
-注意: Discord WebhookのURLは必ず`https://discord.com/api/webhooks/`から始まるURLを設定してください。
-
-## Discord Webhookの設定方法
-
-1. Discordのサーバー設定を開く
-2. 「インテグレーション」→「ウェブフック」を選択
-3. 「新しいウェブフック」を作成
-4. ウェブフックに名前をつけ、投稿したいチャンネルを選択
-5. 「ウェブフックURLをコピー」をクリック
-6. コピーしたURLを`.env`ファイルの`DISCORD_WEBHOOK_URL`に設定
-
-## Slack Webhookの設定方法
-
-1. Slack APIのウェブサイト(https://api.slack.com/apps)にアクセス
-2. 「Create New App」をクリック
-3. アプリを作成し「Incoming Webhooks」を有効化
-4. 「Add New Webhook to Workspace」をクリック
-5. 投稿先のチャンネルを選択
-6. 生成されたWebhook URLをコピー
-7. コピーしたURLを`.env`ファイルの`SLACK_WEBHOOK_URL`に設定
-
-## 実行例
-
-指定した日付の過去記事をまとめ、Discordに投稿：
+基本的なコマンド:
 
 ```bash
-# .envファイルに環境変数を設定後
-secon-year-summary --date 2024-04-20 --post discord --model openai/gpt-4.1-nano
+secon-year-summary [OPTIONS]
 ```
 
-同様にSlackに投稿：
+**オプション:**
 
-```bash
-secon-year-summary --date 2024-04-20 --post slack
-```
+- `-d, --date <YYYY-MM-DD>`: 対象とする日付を指定します。指定しない場合は**一年前の今日**が使用されます。
+- `-m, --model <VENDOR/MODEL_NAME>`: 使用するLLMモデルを指定します。 (デフォルト: `openai/gpt-4.1-nano`)
+  - 例: `openai/gpt-4o`, `google/gemini-1.5-pro`, `anthropic/claude-3-sonnet-20240229`
+- `-y, --years <NUMBER>`: 過去何年分の記事を遡るかを指定します。 (デフォルト: `10`)
+- `-p, --post <DESTINATION>`: 投稿先を指定します。複数指定可能です (`stdout`, `discord`, `slack`)。指定しない場合は `stdout` に出力されます。
+  - 例: `-p discord -p slack`
+- `-v, --verbose`: 詳細なログを出力します。
+
+**実行例:**
+
+1.  **デフォルト設定で実行 (1年前の今日の記事を対象に、OpenAIモデルを使用し、標準出力へ):**
+    ```bash
+    secon-year-summary
+    ```
+
+2.  **特定の日付を指定して実行:**
+    ```bash
+    secon-year-summary -d 2023-05-15
+    ```
+
+3.  **使用するLLMモデルを変更 (Geminiを使用):**
+    ```bash
+    secon-year-summary -m google/gemini-1.5-pro
+    ```
+
+4.  **遡る年数を変更 (過去5年分):**
+    ```bash
+    secon-year-summary -y 5
+    ```
+
+5.  **Discordに投稿:**
+    ```bash
+    secon-year-summary -p discord
+    ```
+
+6.  **Slackと標準出力に投稿し、詳細ログを表示:**
+    ```bash
+    secon-year-summary -p slack -p stdout -v
+    ```
+
+7.  **特定の日付の過去15年分の記事をClaudeモデルで処理し、DiscordとSlackに投稿:**
+    ```bash
+    secon-year-summary -d 2024-01-01 -y 15 -m anthropic/claude-3-opus-20240229 -p discord -p slack
+    ```
+
+## 開発
+
+- **テスト:** `pytest` を使用します。
+  ```bash
+  uv run pytest
+  ```
+- **フォーマット & Lint:** `ruff` と `pyright` を使用します。
+  ```bash
+  # フォーマット
+  uv run ruff format .
+  # Lint
+  uv run ruff check .
+  uv run pyright
+  ```
+
+## ライセンス
+
+[MIT](LICENSE)
