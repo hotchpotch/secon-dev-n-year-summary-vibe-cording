@@ -27,7 +27,7 @@ jobs:
       # uv sync で依存関係をインストール (キャッシュが効いていれば高速)
       # pytest などの開発用依存関係も含まれる想定
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --all-extras
 
       # uv run で pytest を実行
       - name: Run tests
