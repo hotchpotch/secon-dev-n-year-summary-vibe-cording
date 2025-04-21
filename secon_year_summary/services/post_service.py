@@ -24,8 +24,6 @@ def post_to_stdout(
         image_path: 画像パス
     """
     print("\n" + "-" * 50)
-    print("📅 サマリー")
-    print("-" * 50)
     print(summary)
     print("-" * 50)
 
@@ -64,8 +62,7 @@ async def post_to_discord(
         metadata += f"{article.url}\n"
 
     # 投稿内容の作成
-    content = f"**📅 {articles[0].month}月{articles[0].day}日のサマリー**\n\n"
-    content += summary
+    content = summary
 
     # サマリーが長すぎないか確認（Discordの制限は2000文字）
     if len(content) > 2000:
@@ -145,14 +142,6 @@ async def post_to_slack(
 
     # Slack用のメッセージブロック
     blocks = [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": f"📅 {articles[0].month}月{articles[0].day}日のサマリー",
-                "emoji": True,
-            },
-        },
         {"type": "section", "text": {"type": "mrkdwn", "text": summary}},
         {"type": "divider"},
         {
