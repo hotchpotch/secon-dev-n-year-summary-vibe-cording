@@ -1,0 +1,34 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [main] # main ブランチへの push で実行
+  pull_request:
+    branches: [main] # main ブランチへの pull request で実行
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # astral-sh/setup-uv@v5 を使用し、uv のインストール、Python セットアップ、キャッシュを統合
+      - name: Install uv, set up Python, and cache dependencies
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.6.14" # daily_summary.yml とバージョンを合わせる
+          python-version: "3.12" # daily_summary.yml とバージョンを合わせる
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
+
+      # uv sync で依存関係をインストール (キャッシュが効いていれば高速)
+      # pytest などの開発用依存関係も含まれる想定
+      - name: Install dependencies
+        run: uv sync
+
+      # uv run で pytest を実行
+      - name: Run tests
+        run: uv run pytest
