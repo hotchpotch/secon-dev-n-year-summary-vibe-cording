@@ -5,7 +5,6 @@ LLMサービスモジュール - 各種LLMの抽象化と実装
 import abc
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union, cast
 
 from secon_year_summary.models.article import Article
 

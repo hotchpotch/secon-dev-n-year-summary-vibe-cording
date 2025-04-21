@@ -38,11 +38,11 @@ packages = ["secon_year_summary"]
 
 [tool.ruff]
 target-version = "py312"
-line-length = 88
+line-length = 120
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "B", "UP", "PL", "RUF"]
-ignore = []
+select = ["E", "F"]
+ignore = ["F401"]
 
 [tool.ruff.format]
 quote-style = "double"
