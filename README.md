@@ -1,6 +1,6 @@
 # secon-year-summary
 
-※このプロジェクトは、vibe-cording の練習として、全て cursor に書いてもらった実装のみで構成されています。
+※このプロジェクトは、vibe-cording の練習として、ほぼ全て cursor に書いてもらった実装のみで構成されています。
 
 secon.dev サイトの日記を読み込み、指定された日付と同日に書かれた過去の記事をまとめて年間サマリーを生成するツールです。
 
@@ -54,6 +54,10 @@ $ uv run secon-year-summary --model google/gemini-1.5-flash-latest -v -d 2024-01
   • 2020年: https://secon.dev/entry/2020/01/27/000000/
 
 🖼️ サマリー画像が保存されました: output/images/20240127.png
+```
+
+![サマリー画像例](examples/images/20240127.png)
+
 
 ## インストール
 
