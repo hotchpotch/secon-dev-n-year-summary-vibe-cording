@@ -13,9 +13,7 @@ class LLMService(abc.ABC):
     """LLMサービスの抽象基底クラス"""
 
     @abc.abstractmethod
-    async def generate_summary(
-        self, articles: list[Article], target_date: datetime
-    ) -> str:
+    async def generate_summary(self, articles: list[Article], target_date: datetime) -> str:
         """記事リストから要約を生成する"""
         pass
 
@@ -34,13 +32,9 @@ class OpenAIService(LLMService):
             self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             self.model = model
         except ImportError as err:
-            raise ImportError(
-                "OpenAI APIを使用するには、openaiパッケージをインストールしてください。"
-            ) from err
+            raise ImportError("OpenAI APIを使用するには、openaiパッケージをインストールしてください。") from err
 
-    async def generate_summary(
-        self, articles: list[Article], target_date: datetime
-    ) -> str:
+    async def generate_summary(self, articles: list[Article], target_date: datetime) -> str:
         """記事リストから要約を生成する"""
         # 各年ごとの記事コンテンツをまとめる
         articles_by_year: dict[int, list[dict[str, str]]] = {}
@@ -60,8 +54,7 @@ class OpenAIService(LLMService):
         # プロンプトの構築
         # 各年ごとに記事の内容を含めたプロンプトを作成
         prompt = (
-            f"{target_date.month}月{target_date.day}日の以下の日記記事を"
-            f"年ごとに150〜200文字程度でまとめてください。\n"
+            f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
         )
         prompt += (
             "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。"
@@ -80,10 +73,7 @@ class OpenAIService(LLMService):
             prompt += "\n"
 
         prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
-        prompt += (
-            "## YYYY年MM月DD日 [絵文字]\n\n"
-            "[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
-        )
+        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
 
         # APIを呼び出して要約を生成
         # OpenAIのSDKは非同期をネイティブにサポートしていないため、同期的に呼び出す
@@ -118,37 +108,18 @@ class GeminiService(LLMService):
             if not api_key:
                 raise ValueError("GOOGLE_API_KEY環境変数が設定されていません")
 
-            # 現在のGoogle APIに合わせて初期化方法を調整
-            try:
-                # Google APIの構造が変わることがあるため、
-                # 異なるAPI構造に対応
-                if hasattr(genai, "configure"):
-                    # 古いAPIバージョン
-                    # 型チェックを無視
-                    genai.configure(api_key=api_key)
-                    self.model = genai.GenerativeModel(model_name=model)
-                else:
-                    # 新しいAPIバージョン (仮の実装例)
-                    # 型チェックを無視
-                    client_class = getattr(genai, "Client", None)
-                    if client_class:
-                        self.client = client_class(api_key=api_key)
-                        self.model = self.client.get_model(model)
-                    else:
-                        raise AttributeError("APIの構造を特定できません")
-            except AttributeError as e:
-                # configure や GenerativeModel がない場合の対処
-                raise ImportError(
-                    f"Google Gemini APIのバージョンが古いか、互換性がありません: {e}"
-                ) from e
+            # Use the recommended way to initialize Gemini
+            genai.configure(api_key=api_key)  # type: ignore
+            self.model = genai.GenerativeModel(model_name=model)  # type: ignore
+
         except ImportError as err:
             msg = "Google Gemini APIを使用するには、google-generativeaiパッケージを"
             msg += "インストールしてください。"
             raise ImportError(msg) from err
+        except Exception as e:  # Catch other potential initialization errors
+            raise RuntimeError(f"Google Gemini APIの初期化に失敗しました: {e}") from e
 
-    async def generate_summary(
-        self, articles: list[Article], target_date: datetime
-    ) -> str:
+    async def generate_summary(self, articles: list[Article], target_date: datetime) -> str:
         """記事リストから要約を生成する"""
         # 各年ごとの記事コンテンツをまとめる
         articles_by_year: dict[int, list[dict[str, str]]] = {}
@@ -167,8 +138,7 @@ class GeminiService(LLMService):
 
         # プロンプトの構築
         prompt = (
-            f"{target_date.month}月{target_date.day}日の以下の日記記事を"
-            f"年ごとに150〜200文字程度でまとめてください。\n"
+            f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
         )
         prompt += (
             "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。"
@@ -187,16 +157,19 @@ class GeminiService(LLMService):
             prompt += "\n"
 
         prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
-        prompt += (
-            "## YYYY年MM月DD日 [絵文字]\n\n"
-            "[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
-        )
+        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
 
         # APIを呼び出して要約を生成
         # 同期的に呼び出す
         try:
-            response = self.model.generate_content(prompt)
-            return response.text
+            response = self.model.generate_content(prompt)  # type: ignore
+            # Access the text content safely
+            if response and hasattr(response, "text"):
+                return response.text
+            else:
+                # Handle cases where response or text attribute might be missing
+                print(f"Gemini APIからのレスポンスが予期しない形式です: {response}")
+                return "サマリーの生成に失敗しました（レスポンス形式エラー）。"
         except Exception as e:
             print(f"Geminiでのサマリー生成中にエラーが発生しました: {e}")
             return "サマリーの生成に失敗しました。"
@@ -216,13 +189,9 @@ class ClaudeService(LLMService):
             self.client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
             self.model = model
         except ImportError as err:
-            raise ImportError(
-                "Claude APIを使用するには、anthropicパッケージをインストールしてください。"
-            ) from err
+            raise ImportError("Claude APIを使用するには、anthropicパッケージをインストールしてください。") from err
 
-    async def generate_summary(
-        self, articles: list[Article], target_date: datetime
-    ) -> str:
+    async def generate_summary(self, articles: list[Article], target_date: datetime) -> str:
         """記事リストから要約を生成する"""
         # 各年ごとの記事コンテンツをまとめる
         articles_by_year: dict[int, list[dict[str, str]]] = {}
@@ -241,8 +210,7 @@ class ClaudeService(LLMService):
 
         # プロンプトの構築
         prompt = (
-            f"{target_date.month}月{target_date.day}日の以下の日記記事を"
-            f"年ごとに150〜200文字程度でまとめてください。\n"
+            f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
         )
         prompt += (
             "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。"
@@ -261,10 +229,7 @@ class ClaudeService(LLMService):
             prompt += "\n"
 
         prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
-        prompt += (
-            "## YYYY年MM月DD日 [絵文字]\n\n"
-            "[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
-        )
+        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
 
         # APIを呼び出して要約を生成
         try:
@@ -274,15 +239,17 @@ class ClaudeService(LLMService):
                 max_tokens=1500,
                 messages=[{"role": "user", "content": prompt}],
             )
-            # ここはanthropicライブラリのバージョンによって異なる可能性があるため、
-            # response.content[0].textがない場合はstrでキャストして対応
-            if hasattr(response, "content") and len(response.content) > 0:
-                content = response.content[0]
-                if hasattr(content, "text"):
-                    return content.text
-                else:
-                    return str(content)
-            return "サマリーの生成に失敗しました。"
+
+            # Access the text content safely from Claude response
+            if response and response.content and len(response.content) > 0:
+                # Assuming the first block is the main text content (usually TextBlock)
+                first_content_block = response.content[0]
+                if hasattr(first_content_block, "text"):
+                    return first_content_block.text  # Access text attribute directly # type: ignore
+
+            # Handle unexpected response structure
+            print(f"Claude APIからのレスポンスが予期しない形式です: {response}")
+            return "サマリーの生成に失敗しました（レスポンス形式エラー）。"
         except Exception as e:
             print(f"Claudeでのサマリー生成中にエラーが発生しました: {e}")
             return "サマリーの生成に失敗しました。"
@@ -302,9 +269,7 @@ def get_llm_service(model_spec: str) -> LLMService:
     try:
         vendor, model = model_spec.split("/", 1)
     except ValueError as err:
-        raise ValueError(
-            f"モデル指定の形式が不正です: {model_spec} (正しい形式: ベンダー/モデル名)"
-        ) from err
+        raise ValueError(f"モデル指定の形式が不正です: {model_spec} (正しい形式: ベンダー/モデル名)") from err
 
     if vendor.lower() == "openai":
         return OpenAIService(model)

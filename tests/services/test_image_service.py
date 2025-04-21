@@ -3,6 +3,7 @@
 """
 
 import io
+import types  # Add import for TracebackType
 from datetime import datetime
 from pathlib import Path
 from unittest import mock
@@ -30,16 +31,18 @@ def create_mock_image() -> bytes:
 class MockResponseSuccess:
     status = 200
 
-    def __init__(self, image_data=None):
+    def __init__(self, image_data: bytes | None = None):
         self.image_data = image_data or create_mock_image()
 
     async def __aenter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
+    ) -> None:
         pass
 
-    async def read(self):
+    async def read(self) -> bytes:
         return self.image_data
 
 
@@ -50,7 +53,9 @@ class MockResponse404:
     async def __aenter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
+    ) -> None:
         pass
 
 
@@ -59,23 +64,27 @@ class MockResponseError:
     async def __aenter__(self):
         raise Exception("Connection error")
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
+    ) -> None:
         pass
 
 
 # モックClientSession
 class MockClientSession:
-    def __init__(self, response_type="success", image_data=None):
+    def __init__(self, response_type: str = "success", image_data: bytes | None = None):
         self.response_type = response_type
         self.image_data = image_data
 
     async def __aenter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
+    ) -> None:
         pass
 
-    def get(self, url):
+    def get(self, url: str):
         if self.response_type == "success":
             return MockResponseSuccess(self.image_data)
         elif self.response_type == "404":
@@ -121,7 +130,7 @@ class TestImageService:
     async def test_download_image_success(self):
         """画像のダウンロード成功ケース"""
         mock_session = MockClientSession("success")
-        result = await download_image(mock_session, "https://example.com/image.jpg")
+        result = await download_image(mock_session, "https://example.com/image.jpg")  # type: ignore[arg-type]
 
         # ダウンロードが成功しているか確認
         assert result is not None
@@ -131,7 +140,7 @@ class TestImageService:
     async def test_download_image_404(self):
         """画像のダウンロード失敗ケース（404）"""
         mock_session = MockClientSession("404")
-        result = await download_image(mock_session, "https://example.com/notfound.jpg")
+        result = await download_image(mock_session, "https://example.com/notfound.jpg")  # type: ignore[arg-type]
 
         # 404の場合はNoneが返るはず
         assert result is None
@@ -140,7 +149,7 @@ class TestImageService:
     async def test_download_image_error(self):
         """画像のダウンロード失敗ケース（例外発生）"""
         mock_session = MockClientSession("error")
-        result = await download_image(mock_session, "https://example.com/error.jpg")
+        result = await download_image(mock_session, "https://example.com/error.jpg")  # type: ignore[arg-type]
 
         # エラーの場合もNoneが返るはず
         assert result is None
@@ -149,12 +158,8 @@ class TestImageService:
     async def test_create_summary_image_success(self):
         """サマリー画像作成の成功ケース"""
         # 画像ダウンロードのモック
-        with mock.patch(
-            "aiohttp.ClientSession", return_value=MockClientSession("success")
-        ):
-            result = await create_summary_image(
-                self.articles, self.target_date, self.output_path
-            )
+        with mock.patch("aiohttp.ClientSession", return_value=MockClientSession("success")):
+            result = await create_summary_image(self.articles, self.target_date, self.output_path)
 
             # 結果を検証
             assert result is not None
@@ -177,9 +182,7 @@ class TestImageService:
             )
         ]
 
-        result = await create_summary_image(
-            articles_no_images, self.target_date, self.output_path
-        )
+        result = await create_summary_image(articles_no_images, self.target_date, self.output_path)
 
         # 画像URLがない場合はNoneが返るはず
         assert result is None
@@ -191,9 +194,7 @@ class TestImageService:
         """画像ダウンロードが全て失敗した場合のケース"""
         # ダウンロード失敗のモック
         with mock.patch("aiohttp.ClientSession", return_value=MockClientSession("404")):
-            result = await create_summary_image(
-                self.articles, self.target_date, self.output_path
-            )
+            result = await create_summary_image(self.articles, self.target_date, self.output_path)
 
             # ダウンロードが全て失敗した場合はNoneが返るはず
             assert result is None

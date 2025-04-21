@@ -2,6 +2,7 @@
 ArticleFetcherのテスト
 """
 
+import types  # Add import for TracebackType
 from datetime import datetime
 from unittest import mock
 
@@ -39,7 +40,9 @@ class MockResponse404:
     async def __aenter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
+    ) -> None:
         pass
 
 
@@ -50,7 +53,9 @@ class MockResponseSuccess:
     async def __aenter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
+    ) -> None:
         pass
 
     async def text(self):
@@ -62,23 +67,27 @@ class MockResponseError:
     async def __aenter__(self):
         raise Exception("Connection error")
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
+    ) -> None:
         pass
 
 
 class MockClientSession:
     """ClientSessionのモック"""
 
-    def __init__(self, response_type="success"):
+    def __init__(self, response_type: str = "success"):
         self.response_type = response_type
 
     async def __aenter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
+    ) -> None:
         pass
 
-    def get(self, url):
+    def get(self, url: str):
         if self.response_type == "success":
             return MockResponseSuccess()
         elif self.response_type == "404":
@@ -118,7 +127,7 @@ class TestArticleFetcher:
         # 404エラーを返すモックセッション
         with mock.patch("aiohttp.ClientSession", return_value=MockClientSession("404")):
             # 単一の記事取得をテスト
-            article = await self.fetcher._fetch_article(MockClientSession("404"), "https://example.com", 2022, 4, 29)
+            article = await self.fetcher._fetch_article(MockClientSession("404"), "https://example.com", 2022, 4, 29)  # type: ignore[protected-access, arg-type]
             # 404の場合はNoneが返るはず
             assert article is None
 
@@ -127,14 +136,14 @@ class TestArticleFetcher:
         """例外発生時のテスト"""
         # 例外を発生させるモックセッション
         with mock.patch("aiohttp.ClientSession", return_value=MockClientSession("error")):
-            article = await self.fetcher._fetch_article(MockClientSession("error"), "https://example.com", 2022, 4, 29)
+            article = await self.fetcher._fetch_article(MockClientSession("error"), "https://example.com", 2022, 4, 29)  # type: ignore[protected-access, arg-type]
             # エラーの場合もNoneが返るはず
             assert article is None
 
     def test_parse_article(self):
         """HTMLパース処理のテスト"""
         # 正常なHTMLをパース
-        article = self.fetcher._parse_article(MOCK_HTML, "https://example.com", 2022, 4, 29)
+        article = self.fetcher._parse_article(MOCK_HTML, "https://example.com", 2022, 4, 29)  # type: ignore[protected-access]
 
         # 結果を検証
         assert article is not None
@@ -154,12 +163,12 @@ class TestArticleFetcher:
         """必要な要素が欠けたHTMLのパーステスト"""
         # タイトルがないHTML
         html_no_title = "<html><body><article>Content</article></body></html>"
-        article = self.fetcher._parse_article(html_no_title, "https://example.com", 2022, 4, 29)
+        article = self.fetcher._parse_article(html_no_title, "https://example.com", 2022, 4, 29)  # type: ignore[protected-access]
         assert article is None
 
         # 本文がないHTML
         html_no_content = "<html><body><h1>Title</h1></body></html>"
-        article = self.fetcher._parse_article(html_no_content, "https://example.com", 2022, 4, 29)
+        article = self.fetcher._parse_article(html_no_content, "https://example.com", 2022, 4, 29)  # type: ignore[protected-access]
         assert article is None
 
 

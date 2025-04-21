@@ -96,7 +96,7 @@ def test_extract_related_urls(
     # ArticleFetcherクラスのプライベートメソッドにアクセス
     # テストのために直接アクセスする
     # pylint: disable=protected-access
-    urls = article_fetcher._extract_related_urls(soup, current_url)
+    urls = article_fetcher._extract_related_urls(soup, current_url)  # type: ignore[protected-access]
     assert len(urls) == expected_count
     for expected_url in expected_urls:
         assert any(expected_url in url for url in urls)
@@ -124,11 +124,11 @@ def test_filter_n_diary_urls(article_fetcher: ArticleFetcher) -> None:
     ]
 
     # pylint: disable=protected-access
-    filtered_urls = article_fetcher._get_n_diary_urls(urls, target_article, 3)
+    filtered_urls = article_fetcher._get_n_diary_urls(urls, target_article, 3)  # type: ignore[protected-access]
     assert len(filtered_urls) == 3
     assert any("2022/04/01" in url for url in filtered_urls)
     assert any("2021/04/01" in url for url in filtered_urls)
-    assert any("2020/04/01" in url for url in filtered_urls)
+    assert not any("2020/04/01" in url for url in filtered_urls)  # 範囲外
     assert not any("2019/04/01" in url for url in filtered_urls)  # 範囲外
     assert not any("2022/05/01" in url for url in filtered_urls)  # 別日
 

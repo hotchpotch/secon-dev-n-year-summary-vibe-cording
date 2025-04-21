@@ -5,10 +5,11 @@ secon.dev の記事を取得・解析するためのモジュール
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import List
 from urllib.parse import urlparse
 
 import aiohttp
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 
 @dataclass
@@ -22,7 +23,7 @@ class Article:
     year: int
     month: int
     day: int
-    n_diary_urls: list[str] = field(default_factory=list)
+    n_diary_urls: List[str] = field(default_factory=list)  # type: ignore
 
     @property
     def date_str(self) -> str:
@@ -68,16 +69,14 @@ class ArticleFetcher:
                 return []
 
             # 対象日の記事から過去の関連記事のURLを取得
-            n_diary_urls = self._get_n_diary_urls(
-                target_article.n_diary_urls, target_article, self.years_back
-            )
+            n_diary_urls = self._get_n_diary_urls(target_article.n_diary_urls, target_article, self.years_back)
 
             if not n_diary_urls:
                 # 関連記事がない場合は対象日の記事のみ返す
                 return [target_article]
 
             # 過去記事の取得
-            tasks = []
+            tasks: List[asyncio.Task[Article | None]] = []
             for past_url in n_diary_urls:
                 # URLから年月日を抽出
                 try:
@@ -85,16 +84,14 @@ class ArticleFetcher:
                     year = int(date_part[0])
                     month = int(date_part[1])
                     day = int(date_part[2])
-                    tasks.append(
-                        self._fetch_article(session, past_url, year, month, day)
-                    )
+                    tasks.append(asyncio.create_task(self._fetch_article(session, past_url, year, month, day)))
                 except (IndexError, ValueError) as e:
                     print(f"Error parsing URL {past_url}: {e}")
                     continue
 
-            past_articles_results = await asyncio.gather(*tasks)
+            past_articles_results: List[Article | None] = await asyncio.gather(*tasks)
             # None型の要素をフィルタリング
-            past_articles = [a for a in past_articles_results if a is not None]
+            past_articles: List[Article] = [a for a in past_articles_results if a is not None]
 
             # 全記事を返す (対象日 + 過去記事)
             return [target_article] + past_articles
@@ -114,9 +111,7 @@ class ArticleFetcher:
             print(f"Error fetching {url}: {e}")
             return None
 
-    def _parse_article(
-        self, html: str, url: str, year: int, month: int, day: int
-    ) -> Article | None:
+    def _parse_article(self, html: str, url: str, year: int, month: int, day: int) -> Article | None:
         """HTMLを解析して記事オブジェクトを作成する"""
         soup = BeautifulSoup(html, "html.parser")
 
@@ -140,22 +135,33 @@ class ArticleFetcher:
         if not content_tag:
             return None
 
-        # 本文からスクリプトやスタイルを除外
-        for tag in content_tag.find_all(["script", "style"]):
-            tag.decompose()
-
-        content = content_tag.get_text(strip=True)
+        # Ensure content_tag is a Tag before calling find_all
+        if isinstance(content_tag, Tag):
+            # 本文からスクリプトやスタイルを除外
+            for tag in content_tag.find_all(["script", "style"]):
+                if isinstance(tag, Tag):
+                    tag.decompose()
+            content = content_tag.get_text(strip=True)
+        else:
+            # Handle the case where content_tag is not a Tag (e.g., NavigableString)
+            # In this case, maybe the content is just the string itself?
+            # Or return None/empty string depending on desired behavior.
+            content = str(content_tag).strip()
+            if not content:
+                return None  # Or handle appropriately
 
         # OG画像の抽出
-        image_url = None
+        image_url: str | None = None
         og_image = soup.find("meta", property="og:image")
-        if og_image and hasattr(og_image, "attrs"):
+        if og_image and isinstance(og_image, Tag) and hasattr(og_image, "attrs"):
             content_attr = og_image.get("content")
-            if content_attr:
-                image_url = str(content_attr)
+            if isinstance(content_attr, str):
+                image_url = content_attr
+            elif isinstance(content_attr, list):
+                image_url = content_attr[0] if content_attr else None
 
         # 過去の記事URLの抽出
-        n_diary_urls = self._extract_related_urls(soup, url)
+        n_diary_urls: List[str] = self._extract_related_urls(soup, url)
 
         return Article(
             url=url,
@@ -168,9 +174,9 @@ class ArticleFetcher:
             n_diary_urls=n_diary_urls,
         )
 
-    def _extract_related_urls(self, soup: BeautifulSoup, current_url: str) -> list[str]:
+    def _extract_related_urls(self, soup: BeautifulSoup, current_url: str) -> List[str]:
         """関連記事のURLを抽出する"""
-        hrefs: list[str] = []
+        hrefs: List[str] = []
         for tag in soup.select(".similar-entries .similar-thumb-entry div > a"):
             if hasattr(tag, "get"):
                 href = tag.get("href")
@@ -188,19 +194,15 @@ class ArticleFetcher:
         # 重複を除去してURLをソート（降順）
         return list(sorted(set(hrefs), reverse=True))
 
-    def _get_n_diary_urls(
-        self, urls: list[str], target_article: Article, years_back: int
-    ) -> list[str]:
+    def _get_n_diary_urls(self, urls: List[str], target_article: Article, years_back: int) -> List[str]:
         """対象記事の日付より過去のURLのみを抽出し、指定年数以内のものに絞る"""
         if not urls:
             return []
 
-        base_date = datetime(
-            target_article.year, target_article.month, target_article.day
-        )
+        base_date = datetime(target_article.year, target_article.month, target_article.day)
         min_date = base_date - timedelta(days=years_back * 365)
 
-        filtered_urls: list[str] = []
+        filtered_urls: List[str] = []
         for url in urls:
             try:
                 # URLから年月日を抽出
@@ -210,11 +212,7 @@ class ArticleFetcher:
                 day = int(date_part[2])
 
                 # 同じ月日のもののみを抽出
-                if (
-                    month == target_article.month
-                    and day == target_article.day
-                    and year < target_article.year
-                ):
+                if month == target_article.month and day == target_article.day and year < target_article.year:
                     # 指定された年数以内かをチェック
                     url_date = datetime(year, month, day)
                     if url_date >= min_date:

@@ -2,7 +2,7 @@
 
 from typing import Any
 
-import pytest
+# import pytest # Remove unused import
 
 
 # 非同期テスト用のマーカーを登録

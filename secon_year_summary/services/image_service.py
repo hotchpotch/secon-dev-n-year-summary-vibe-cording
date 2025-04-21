@@ -7,6 +7,7 @@ import io
 import math
 from datetime import datetime
 from pathlib import Path
+from typing import Set, Tuple
 
 import aiohttp
 from PIL import Image, ImageDraw, ImageFont
@@ -55,9 +56,7 @@ def crop_to_aspect_ratio(img: Image.Image, target_ratio: float = 3 / 2) -> Image
     return img
 
 
-async def create_summary_image(
-    articles: list[Article], target_date: datetime, output_path: Path
-) -> Path | None:
+async def create_summary_image(articles: list[Article], target_date: datetime, output_path: Path) -> Path | None:
     """
     記事リストから年間サマリー画像を生成する
 
@@ -70,10 +69,8 @@ async def create_summary_image(
         生成された画像のパス（失敗した場合はNone）
     """
     # 画像URLの収集（重複を除外）
-    image_urls = set()
-    article_dates: dict[
-        str, tuple[int, int, int]
-    ] = {}  # 画像URLと記事の年月日を関連付ける辞書
+    image_urls: Set[str] = set()
+    article_dates: dict[str, Tuple[int, int, int]] = {}  # 画像URLと記事の年月日を関連付ける辞書
 
     for article in articles:
         if article.image_url:
@@ -92,13 +89,14 @@ async def create_summary_image(
     # 非同期で画像をダウンロード
     async with aiohttp.ClientSession() as session:
         tasks = [download_image(session, url) for url in image_urls]
-        image_data_list = await asyncio.gather(*tasks)
+        image_data_list: list[bytes | None] = await asyncio.gather(*tasks)
 
     # 成功したダウンロードのみフィルタリング
     successful_downloads: list[tuple[bytes, tuple[int, int, int] | None]] = []
+    url_list = list(image_urls)
     for i, data in enumerate(image_data_list):
         if data:
-            url = list(image_urls)[i]
+            url = url_list[i]
             successful_downloads.append((data, article_dates.get(url)))
 
     if not successful_downloads:
@@ -150,9 +148,7 @@ async def create_summary_image(
                     # PIL 9.2.0以降の場合
                     text_width = draw.textlength(date_text, font=font)
                     text_bbox = font.getbbox(date_text)
-                    text_height = (
-                        text_bbox[3] if text_bbox else 12
-                    )  # フォントの高さを取得
+                    text_height = text_bbox[3] if text_bbox else 12  # フォントの高さを取得
                 except AttributeError:
                     # 古いバージョンの場合
                     text_bbox = font.getbbox(date_text)
