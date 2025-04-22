@@ -41,6 +41,8 @@ jobs:
       - name: Run summary script
         run: uv run secon-year-summary --model gemini/gemini-2.5-flash-preview-04-17 -v -p discord
         env:
+          # タイムゾーンをJSTに設定
+          TZ: "Asia/Tokyo"
           # GitHub リポジトリの Secrets に GOOGLE_API_KEY を設定してください
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           # GitHub リポジトリの Secrets に DISCORD_WEBHOOK_URL を設定してください
