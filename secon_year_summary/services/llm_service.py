@@ -17,6 +17,58 @@ class LLMService(abc.ABC):
         """記事リストから要約を生成する"""
         pass
 
+    def _build_summary_prompt(self, articles: list[Article], target_date: datetime) -> str:
+        """要約生成のためのプロンプトを構築する
+
+        Args:
+            articles: 要約対象の記事リスト
+            target_date: 対象日
+
+        Returns:
+            str: 構築されたプロンプト
+        """
+        # 各年ごとの記事コンテンツをまとめる
+        articles_by_year: dict[int, list[dict[str, str]]] = {}
+        for article in articles:
+            year = article.year
+            article_data = {
+                "title": article.title,
+                "content": article.content,
+                "url": article.url,
+            }
+
+            if year not in articles_by_year:
+                articles_by_year[year] = [article_data]
+            else:
+                articles_by_year[year].append(article_data)
+
+        # プロンプトの構築
+        prompt = (
+            f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに50-100文字程度でまとめてください。\n"
+        )
+        prompt += (
+            "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。"
+            "人や場所や店名など固有名詞はできる限り利用してください。"
+            "より具体的なエピソードや感想を含めると良いです。\n\n"
+        )
+
+        for year, article_list in sorted(articles_by_year.items(), reverse=True):
+            prompt += f"## {year}年の記事\n"
+
+            for i, article_data in enumerate(article_list):
+                if i > 0:
+                    prompt += "\n--- 同じ日の別記事 ---\n"
+                prompt += f"タイトル: {article_data['title']}\n"
+                prompt += f"内容: {article_data['content'][:1000]}...\n"
+
+            prompt += "\n"
+
+        prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
+        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
+        prompt += "上記フォーマットの、サマリー以外の余計な文字列は一切出力しないこと。"
+
+        return prompt
+
 
 class OpenAIService(LLMService):
     """OpenAI APIを使用したLLMサービス"""
@@ -36,44 +88,9 @@ class OpenAIService(LLMService):
 
     async def generate_summary(self, articles: list[Article], target_date: datetime) -> str:
         """記事リストから要約を生成する"""
-        # 各年ごとの記事コンテンツをまとめる
-        articles_by_year: dict[int, list[dict[str, str]]] = {}
-        for article in articles:
-            year = article.year
-            article_data = {
-                "title": article.title,
-                "content": article.content,
-                "url": article.url,
-            }
-
-            if year not in articles_by_year:
-                articles_by_year[year] = [article_data]
-            else:
-                articles_by_year[year].append(article_data)
-
-        # プロンプトの構築
-        # 各年ごとに記事の内容を含めたプロンプトを作成
-        prompt = (
-            f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
-        )
-        prompt += (
-            "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。"
-            "より具体的なエピソードや感想を含めると良いです。\n\n"
-        )
-
-        for year, article_list in sorted(articles_by_year.items(), reverse=True):
-            prompt += f"## {year}年の記事\n"
-
-            for i, article_data in enumerate(article_list):
-                if i > 0:
-                    prompt += "\n--- 同じ日の別記事 ---\n"
-                prompt += f"タイトル: {article_data['title']}\n"
-                prompt += f"内容: {article_data['content'][:1000]}...\n"
-
-            prompt += "\n"
-
-        prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
-        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
+        # プロンプトを親クラスのメソッドで構築
+        prompt = self._build_summary_prompt(articles, target_date)
+        # OpenAI特有のプロンプト追加部分
         prompt += "\nサマリー以外の余計な文字列は一切出力しないこと。"
 
         # APIを呼び出して要約を生成
@@ -122,43 +139,8 @@ class GeminiService(LLMService):
 
     async def generate_summary(self, articles: list[Article], target_date: datetime) -> str:
         """記事リストから要約を生成する"""
-        # 各年ごとの記事コンテンツをまとめる
-        articles_by_year: dict[int, list[dict[str, str]]] = {}
-        for article in articles:
-            year = article.year
-            article_data = {
-                "title": article.title,
-                "content": article.content,
-                "url": article.url,
-            }
-
-            if year not in articles_by_year:
-                articles_by_year[year] = [article_data]
-            else:
-                articles_by_year[year].append(article_data)
-
-        # プロンプトの構築
-        prompt = (
-            f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
-        )
-        prompt += (
-            "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。"
-            "より具体的なエピソードや感想を含めると良いです。\n\n"
-        )
-
-        for year, article_list in sorted(articles_by_year.items(), reverse=True):
-            prompt += f"## {year}年の記事\n"
-
-            for i, article_data in enumerate(article_list):
-                if i > 0:
-                    prompt += "\n--- 同じ日の別記事 ---\n"
-                prompt += f"タイトル: {article_data['title']}\n"
-                prompt += f"内容: {article_data['content'][:1000]}...\n"
-
-            prompt += "\n"
-
-        prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
-        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
+        # プロンプトを親クラスのメソッドで構築
+        prompt = self._build_summary_prompt(articles, target_date)
 
         # APIを呼び出して要約を生成
         # 同期的に呼び出す
@@ -194,43 +176,8 @@ class ClaudeService(LLMService):
 
     async def generate_summary(self, articles: list[Article], target_date: datetime) -> str:
         """記事リストから要約を生成する"""
-        # 各年ごとの記事コンテンツをまとめる
-        articles_by_year: dict[int, list[dict[str, str]]] = {}
-        for article in articles:
-            year = article.year
-            article_data = {
-                "title": article.title,
-                "content": article.content,
-                "url": article.url,
-            }
-
-            if year not in articles_by_year:
-                articles_by_year[year] = [article_data]
-            else:
-                articles_by_year[year].append(article_data)
-
-        # プロンプトの構築
-        prompt = (
-            f"{target_date.month}月{target_date.day}日の以下の日記記事を年ごとに150〜200文字程度でまとめてください。\n"
-        )
-        prompt += (
-            "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください。"
-            "より具体的なエピソードや感想を含めると良いです。\n\n"
-        )
-
-        for year, article_list in sorted(articles_by_year.items(), reverse=True):
-            prompt += f"## {year}年の記事\n"
-
-            for i, article_data in enumerate(article_list):
-                if i > 0:
-                    prompt += "\n--- 同じ日の別記事 ---\n"
-                prompt += f"タイトル: {article_data['title']}\n"
-                prompt += f"内容: {article_data['content'][:1000]}...\n"
-
-            prompt += "\n"
-
-        prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
-        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
+        # プロンプトを親クラスのメソッドで構築
+        prompt = self._build_summary_prompt(articles, target_date)
 
         # APIを呼び出して要約を生成
         try:
