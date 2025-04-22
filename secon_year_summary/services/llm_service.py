@@ -58,13 +58,13 @@ class LLMService(abc.ABC):
             for i, article_data in enumerate(article_list):
                 if i > 0:
                     prompt += "\n--- 同じ日の別記事 ---\n"
-                prompt += f"タイトル: {article_data['title']}\n"
-                prompt += f"内容: {article_data['content'][:1000]}...\n"
+                prompt += f"<title>{article_data['title']}</title>\n"
+                prompt += f"<content>{article_data['content'][:1000]}</content>\n"
 
             prompt += "\n"
 
         prompt += "以下のフォーマットで各年のサマリーを作成してください：\n"
-        prompt += "## YYYY年MM月DD日 [絵文字]\n\n[150〜200文字程度の要約、具体的なエピソードや感想を含める]\n"
+        prompt += "## [絵文字] YYYY年MM月DD日\n\n[要約、具体的なエピソードや感想を含める]\n"
         prompt += "上記フォーマットの、サマリー以外の余計な文字列は一切出力しないこと。"
 
         return prompt
