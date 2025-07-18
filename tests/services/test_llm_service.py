@@ -65,7 +65,7 @@ class TestLLMService:
         assert "これはテスト記事1の内容です。" in prompt
         assert "これはテスト記事2の内容です。" in prompt
         assert "各年ごとに、その日の出来事や感情を要約し、絵文字を1つ追加してください" in prompt
-        assert "## YYYY年MM月DD日 [絵文字]" in prompt
+        assert "## [絵文字] YYYY年MM月DD日" in prompt
 
     def test_get_llm_service(self):
         """get_llm_serviceメソッドのテスト（例外ケース）"""

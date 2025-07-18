@@ -39,7 +39,7 @@ jobs:
 
       # uv run でスクリプトを実行
       - name: Run summary script
-        run: uv run secon-year-summary --model gemini/gemini-2.5-flash-preview-04-17 -v -p discord
+        run: uv run secon-year-summary --model gemini/gemini-2.5-flash -v -p discord
         env:
           # タイムゾーンをJSTに設定
           TZ: "Asia/Tokyo"
