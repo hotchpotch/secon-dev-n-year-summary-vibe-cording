@@ -95,19 +95,26 @@ class OpenAIService(LLMService):
 
         # APIを呼び出して要約を生成
         # OpenAIのSDKは非同期をネイティブにサポートしていないため、同期的に呼び出す
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=1500,
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=1500,
+            )
 
-        # 返り値がNoneの場合があるのでその対応
-        content = response.choices[0].message.content
-        if content is None:
-            return "サマリーの生成に失敗しました。"
+            # 返り値がNoneの場合があるのでその対応
+            content = response.choices[0].message.content
+            if content is None:
+                return "サマリーの生成に失敗しました（レスポンスが空）。"
 
-        return content
+            return content
+        except Exception as e:
+            # エラーの詳細を出力して原因を特定しやすくする
+            import traceback
+            print(f"OpenAIでのサマリー生成中にエラーが発生しました: {type(e).__name__}: {e}")
+            print(f"詳細なトレースバック:\n{traceback.format_exc()}")
+            return f"サマリーの生成に失敗しました（{type(e).__name__}）。"
 
 
 class GeminiService(LLMService):
@@ -128,7 +135,11 @@ class GeminiService(LLMService):
 
             # Use the recommended way to initialize Gemini
             genai.configure(api_key=api_key)  # type: ignore
-            self.model = genai.GenerativeModel(model_name=model)  # type: ignore
+            try:
+                self.model = genai.GenerativeModel(model_name=model)  # type: ignore
+            except Exception as model_err:
+                print(f"モデル'{model}'の初期化に失敗しました: {model_err}")
+                raise RuntimeError(f"無効なGeminiモデル名: {model}") from model_err
 
         except ImportError as err:
             msg = "Google Gemini APIを使用するには、google-generativeaiパッケージを"
@@ -154,8 +165,11 @@ class GeminiService(LLMService):
                 print(f"Gemini APIからのレスポンスが予期しない形式です: {response}")
                 return "サマリーの生成に失敗しました（レスポンス形式エラー）。"
         except Exception as e:
-            print(f"Geminiでのサマリー生成中にエラーが発生しました: {e}")
-            return "サマリーの生成に失敗しました。"
+            # エラーの詳細を出力して原因を特定しやすくする
+            import traceback
+            print(f"Geminiでのサマリー生成中にエラーが発生しました: {type(e).__name__}: {e}")
+            print(f"詳細なトレースバック:\n{traceback.format_exc()}")
+            return f"サマリーの生成に失敗しました（{type(e).__name__}）。"
 
 
 class ClaudeService(LLMService):
@@ -199,8 +213,11 @@ class ClaudeService(LLMService):
             print(f"Claude APIからのレスポンスが予期しない形式です: {response}")
             return "サマリーの生成に失敗しました（レスポンス形式エラー）。"
         except Exception as e:
-            print(f"Claudeでのサマリー生成中にエラーが発生しました: {e}")
-            return "サマリーの生成に失敗しました。"
+            # エラーの詳細を出力して原因を特定しやすくする
+            import traceback
+            print(f"Claudeでのサマリー生成中にエラーが発生しました: {type(e).__name__}: {e}")
+            print(f"詳細なトレースバック:\n{traceback.format_exc()}")
+            return f"サマリーの生成に失敗しました（{type(e).__name__}）。"
 
 
 def get_llm_service(model_spec: str) -> LLMService:
@@ -221,9 +238,9 @@ def get_llm_service(model_spec: str) -> LLMService:
 
     if vendor.lower() == "openai":
         return OpenAIService(model)
-    elif vendor.lower() == "gemini":
+    elif vendor.lower() in ["gemini", "google"]:
         return GeminiService(model)
-    elif vendor.lower() == "claude":
+    elif vendor.lower() in ["claude", "anthropic"]:
         return ClaudeService(model)
     else:
         raise ValueError(f"サポートされていないベンダーです: {vendor}")
